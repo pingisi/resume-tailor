@@ -156,6 +156,174 @@ header h1 {
   font-weight: 600;
 }
 
+/* ---------- Aux tabs (Preview / ATS / Diff) ---------- */
+.aux-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+.aux-tab {
+  border: 1px solid #e5e7eb;
+  background: white;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  color: #4b5563;
+}
+.aux-tab.active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+/* ---------- Streaming pill ---------- */
+.streaming-pill {
+  margin-left: 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* ---------- ATS score ---------- */
+.ats {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  background: #f9fafb;
+}
+.ats-good { border-left: 4px solid #059669; }
+.ats-ok   { border-left: 4px solid #d97706; }
+.ats-low  { border-left: 4px solid #dc2626; }
+.ats-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.ats-score {
+  display: flex;
+  align-items: baseline;
+  font-weight: 700;
+}
+.ats-good .ats-num { color: #059669; }
+.ats-ok   .ats-num { color: #d97706; }
+.ats-low  .ats-num { color: #dc2626; }
+.ats-num { font-size: 2rem; line-height: 1; }
+.ats-suffix { font-size: 0.85rem; color: #6b7280; margin-left: 0.15rem; }
+.ats-text { font-size: 0.95rem; }
+.ats-details {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+.ats-details summary {
+  cursor: pointer;
+  color: #4b5563;
+  font-weight: 500;
+}
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+.chip {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+.chip-missing {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+.chip-matched {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+/* ---------- Diff view ---------- */
+.diff {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+}
+.diff-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.diff-mode {
+  display: flex;
+  gap: 0.25rem;
+}
+.diff-mode .tab {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 5px;
+  border-bottom-width: 1px;
+  background: white;
+  color: #4b5563;
+}
+.diff-mode .tab.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+.diff-body {
+  margin: 0;
+  padding: 0.75rem 0;
+  max-height: 480px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.diff-line {
+  display: block;
+  padding: 0 0.75rem;
+}
+.diff-marker {
+  display: inline-block;
+  width: 1ch;
+  margin-right: 0.5ch;
+  color: #9ca3af;
+  user-select: none;
+}
+.diff-add {
+  background: #ecfdf5;
+  color: #065f46;
+}
+.diff-add .diff-marker { color: #059669; }
+.diff-rem {
+  background: #fef2f2;
+  color: #991b1b;
+  text-decoration: line-through;
+}
+.diff-rem .diff-marker { color: #dc2626; }
+.diff-eq { color: #374151; }
+
 footer {
   text-align: center;
   margin-top: 1rem;

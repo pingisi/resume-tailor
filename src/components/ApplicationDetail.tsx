@@ -3,6 +3,7 @@ import type { Application, ApplicationStatus } from '../types';
 import {
   APPLICATION_STATUSES,
   deleteApplication,
+  getResume,
   updateApplication,
 } from '../lib/storage';
 import { OutputPanel } from './OutputPanel';
@@ -16,11 +17,23 @@ interface Props {
 
 export function ApplicationDetail({ application, onBack, onChange }: Props) {
   const [notes, setNotes] = useState(application.notes ?? '');
+  const [originalResume, setOriginalResume] = useState<string | undefined>();
   const notesTimer = useRef<number | null>(null);
 
   useEffect(() => {
     setNotes(application.notes ?? '');
   }, [application.id, application.notes]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const r = await getResume(application.resumeId);
+      if (!cancelled) setOriginalResume(r?.text);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [application.resumeId]);
 
   useEffect(() => {
     if (notes === (application.notes ?? '')) return;
@@ -140,6 +153,8 @@ export function ApplicationDetail({ application, onBack, onChange }: Props) {
       <OutputPanel
         resume={application.generatedResume}
         coverLetter={application.generatedCoverLetter}
+        originalResume={originalResume}
+        jobDescription={application.jobDescription}
       />
 
       <details className="card">

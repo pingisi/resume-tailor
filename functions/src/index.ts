@@ -1,10 +1,13 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import * as cheerio from 'cheerio';
 
 const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
 
 const MODEL = 'gemini-2.5-flash';
+
+const COVER_DELIM = '<<<COVER_LETTER>>>';
 
 const SYSTEM_PROMPT = `You are an expert resume writer and career coach.
 You will receive a candidate's existing resume and a job description, plus
@@ -21,12 +24,17 @@ Your task:
    specific requirements from the job description and how the candidate's
    background meets them.
 
-Return STRICT JSON with this shape and nothing else:
-{
-  "resume": "<markdown resume>",
-  "coverLetter": "<markdown cover letter>"
-}
-Use clean Markdown headings (##) for resume sections.`;
+Output format — RAW MARKDOWN ONLY, NO JSON, NO CODE FENCES:
+
+<resume markdown using ## headings for sections>
+
+${COVER_DELIM}
+
+<cover letter markdown>
+
+The literal token "${COVER_DELIM}" MUST appear on its own line between the
+two documents. Output nothing before the resume and nothing after the cover
+letter.`;
 
 interface Recipient {
   name?: string;
@@ -42,11 +50,31 @@ interface Body {
   recipient?: Recipient;
 }
 
+function buildPrompt(b: Body): string {
+  const parts: (string | null)[] = [
+    `Tone: ${(b.tone || 'professional').trim()}`,
+    b.company ? `Company: ${b.company.trim()}` : null,
+    b.role ? `Target role: ${b.role.trim()}` : null,
+    b.recipient?.name
+      ? `Hiring manager: ${b.recipient.name.trim()}${
+          b.recipient.title ? ` (${b.recipient.title.trim()})` : ''
+        }`
+      : null,
+    '',
+    '=== EXISTING RESUME ===',
+    (b.resumeText || '').trim(),
+    '',
+    '=== JOB DESCRIPTION ===',
+    (b.jobDescription || '').trim(),
+  ];
+  return parts.filter((l) => l !== null).join('\n');
+}
+
 export const generate = onRequest(
   {
     cors: true,
     secrets: [GEMINI_API_KEY],
-    timeoutSeconds: 120,
+    timeoutSeconds: 180,
     memory: '512MiB',
     region: 'us-central1',
   },
@@ -59,11 +87,6 @@ export const generate = onRequest(
     const body = (req.body || {}) as Body;
     const resumeText = (body.resumeText || '').trim();
     const jobDescription = (body.jobDescription || '').trim();
-    const tone = (body.tone || 'professional').trim();
-    const company = (body.company || '').trim();
-    const role = (body.role || '').trim();
-    const recipientName = (body.recipient?.name || '').trim();
-    const recipientTitle = (body.recipient?.title || '').trim();
 
     if (resumeText.length < 50 || jobDescription.length < 30) {
       res.status(400).json({ error: 'Resume or job description too short.' });
@@ -74,53 +97,189 @@ export const generate = onRequest(
       return;
     }
 
+    const wantsStream =
+      req.query.stream === '1' ||
+      req.headers['accept']?.toString().includes('text/plain');
+
     try {
       const genAI = new GoogleGenerativeAI(GEMINI_API_KEY.value());
       const model = genAI.getGenerativeModel({
         model: MODEL,
         systemInstruction: SYSTEM_PROMPT,
         generationConfig: {
-          responseMimeType: 'application/json',
+          // Plain text streaming, not JSON
           temperature: 0.6,
         },
       });
 
-      const promptLines: (string | null)[] = [
-        `Tone: ${tone}`,
-        company ? `Company: ${company}` : null,
-        role ? `Target role: ${role}` : null,
-        recipientName
-          ? `Hiring manager: ${recipientName}${recipientTitle ? ` (${recipientTitle})` : ''}`
-          : null,
-        '',
-        '=== EXISTING RESUME ===',
-        resumeText,
-        '',
-        '=== JOB DESCRIPTION ===',
-        jobDescription,
-      ];
-      const userPrompt = promptLines.filter((l) => l !== null).join('\n');
+      const userPrompt = buildPrompt(body);
 
+      if (wantsStream) {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders?.();
+
+        const result = await model.generateContentStream(userPrompt);
+        for await (const chunk of result.stream) {
+          const text = chunk.text();
+          if (text) {
+            res.write(text);
+            // Flush is best-effort; only present when compression middleware adds it.
+            (res as unknown as { flush?: () => void }).flush?.();
+          }
+        }
+        res.end();
+        return;
+      }
+
+      // Non-streaming fallback (collects then sends JSON)
       const result = await model.generateContent(userPrompt);
-      const text = result.response.text();
-
-      let parsed: { resume?: string; coverLetter?: string };
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        res.status(502).json({ error: 'Model returned non-JSON.', raw: text });
+      const full = result.response.text();
+      const idx = full.indexOf(COVER_DELIM);
+      if (idx < 0) {
+        res.status(502).json({
+          error: 'Model response missing cover letter delimiter.',
+          raw: full.substring(0, 200),
+        });
         return;
       }
-
-      if (!parsed.resume || !parsed.coverLetter) {
-        res.status(502).json({ error: 'Model response missing fields.' });
-        return;
-      }
-
-      res.json({ resume: parsed.resume, coverLetter: parsed.coverLetter });
-    } catch (err: any) {
+      const resume = full.substring(0, idx).trim();
+      const coverLetter = full.substring(idx + COVER_DELIM.length).trim();
+      res.json({ resume, coverLetter });
+    } catch (err) {
+      const e = err as { message?: string };
       console.error('generate error', err);
-      res.status(500).json({ error: err?.message || 'Internal error' });
+      if (!res.headersSent) {
+        res.status(500).json({ error: e?.message || 'Internal error' });
+      } else {
+        try {
+          res.end();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+);
+
+// ---------- Job description URL fetcher ----------
+
+const PRIVATE_HOST_RE =
+  /^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.|::1$|fc00:|fd00:|fe80:|172\.(1[6-9]|2[0-9]|3[0-1])\.)/i;
+
+export const fetchJd = onRequest(
+  {
+    cors: true,
+    timeoutSeconds: 30,
+    memory: '256MiB',
+    region: 'us-central1',
+  },
+  async (req, res) => {
+    const rawUrl =
+      req.method === 'GET'
+        ? (req.query.url as string | undefined)
+        : (req.body?.url as string | undefined);
+    if (!rawUrl || typeof rawUrl !== 'string') {
+      res.status(400).json({ error: 'Missing url' });
+      return;
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      res.status(400).json({ error: 'Invalid URL' });
+      return;
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      res.status(400).json({ error: 'Only http(s) URLs are supported' });
+      return;
+    }
+    if (PRIVATE_HOST_RE.test(parsed.hostname)) {
+      res.status(403).json({ error: 'Refusing to fetch private host' });
+      return;
+    }
+
+    try {
+      const upstream = await fetch(parsed.toString(), {
+        method: 'GET',
+        redirect: 'follow',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (compatible; ResumeTailorBot/1.0; +https://resume-tailor-pingisi.web.app)',
+          Accept: 'text/html,application/xhtml+xml',
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!upstream.ok) {
+        res
+          .status(502)
+          .json({ error: `Upstream returned ${upstream.status}` });
+        return;
+      }
+      const ct = upstream.headers.get('content-type') || '';
+      if (!ct.includes('text/html') && !ct.includes('application/xhtml')) {
+        res.status(415).json({ error: `Unsupported content type: ${ct}` });
+        return;
+      }
+      const html = await upstream.text();
+      if (html.length > 2_000_000) {
+        res.status(413).json({ error: 'Page too large' });
+        return;
+      }
+
+      const $ = cheerio.load(html);
+      $(
+        'script, style, noscript, nav, header, footer, aside, form, button, iframe, svg'
+      ).remove();
+
+      // Try to focus on likely main JD container, else fall back to body.
+      const candidates = [
+        'main',
+        'article',
+        '[role="main"]',
+        '.job-description',
+        '#job-description',
+        '.jobDescriptionText',
+        '#jobDescriptionText',
+        '.description__text',
+        '.posting-content',
+      ];
+      let root = $();
+      for (const sel of candidates) {
+        const el = $(sel).first();
+        if (el.length && el.text().trim().length > 200) {
+          root = el;
+          break;
+        }
+      }
+      if (root.length === 0) root = $('body');
+
+      const title =
+        $('meta[property="og:title"]').attr('content') ||
+        $('title').first().text() ||
+        '';
+
+      const text = root
+        .text()
+        .replace(/\r/g, '')
+        .replace(/[\t\u00a0]+/g, ' ')
+        .replace(/[ ]{2,}/g, ' ')
+        .replace(/\n[ ]+/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+        .substring(0, 12000);
+
+      res.json({ title: title.trim(), text });
+    } catch (err) {
+      const e = err as { name?: string; message?: string };
+      if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+        res.status(504).json({ error: 'Upstream timed out' });
+        return;
+      }
+      console.error('fetchJd error', err);
+      res.status(500).json({ error: e?.message || 'Internal error' });
     }
   }
 );

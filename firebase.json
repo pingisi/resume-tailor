@@ -6,6 +6,7 @@
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "rewrites": [
         { "source": "/api/generate", "function": "generate" },
+        { "source": "/api/fetch-jd", "function": "fetchJd" },
         { "source": "**", "destination": "/index.html" }
       ]
     }

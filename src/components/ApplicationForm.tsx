@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Application, StoredResume } from '../types';
-import { generateDocuments } from '../api/generate';
+import {
+  generateDocumentsStream,
+  fetchJobDescriptionFromUrl,
+} from '../api/generate';
 import { makeApplicationId, saveApplication } from '../lib/storage';
 import { OutputPanel } from './OutputPanel';
 
@@ -19,18 +22,21 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
   const [recipientName, setRecipientName] = useState('');
   const [recipientTitle, setRecipientTitle] = useState('');
   const [jobDescription, setJobDescription] = useState('');
+  const [jdUrl, setJdUrl] = useState('');
+  const [fetchingJd, setFetchingJd] = useState(false);
   const [tone, setTone] = useState('professional');
   const [busy, setBusy] = useState(false);
+  const [streaming, setStreaming] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resumeOut, setResumeOut] = useState('');
   const [coverOut, setCoverOut] = useState('');
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!resumeId && defaultResumeId) setResumeId(defaultResumeId);
   }, [defaultResumeId, resumeId]);
 
-  // Auto-suggest application name from company + role
   useEffect(() => {
     if (nameTouched) return;
     if (company && role) setName(`${role} @ ${company}`);
@@ -47,35 +53,80 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
   const canGenerate =
     !!selectedResume &&
     selectedResume.text.trim().length > 50 &&
-    jobDescription.trim().length > 30;
+    jobDescription.trim().length > 30 &&
+    !busy;
 
   const canSave = !!resumeOut && !!coverOut && !!name.trim();
+
+  async function handleFetchJd() {
+    if (!jdUrl.trim()) return;
+    setFetchingJd(true);
+    setError(null);
+    try {
+      const result = await fetchJobDescriptionFromUrl(jdUrl.trim());
+      setJobDescription(result.text);
+      // Try to backfill role/company from page title if both empty.
+      if (!role && !company && result.title) {
+        const t = result.title.trim();
+        const parts = t.split(/\s+(?:at|@|–|-|\|)\s+/i);
+        if (parts.length >= 2) {
+          if (!role) setRole(parts[0].trim());
+          if (!company) setCompany(parts[1].replace(/\s*[-–|].*$/, '').trim());
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to fetch URL.';
+      setError(msg);
+    } finally {
+      setFetchingJd(false);
+    }
+  }
 
   async function handleGenerate() {
     if (!selectedResume) return;
     setBusy(true);
+    setStreaming(true);
     setError(null);
     setResumeOut('');
     setCoverOut('');
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
     try {
-      const out = await generateDocuments({
-        resumeText: selectedResume.text,
-        jobDescription,
-        tone,
-        company: company || undefined,
-        role: role || undefined,
-        recipient:
-          recipientName || recipientTitle
-            ? { name: recipientName || undefined, title: recipientTitle || undefined }
-            : undefined,
-      });
-      setResumeOut(out.resume);
-      setCoverOut(out.coverLetter);
-    } catch (e: any) {
-      setError(e?.message || 'Generation failed.');
+      await generateDocumentsStream(
+        {
+          resumeText: selectedResume.text,
+          jobDescription,
+          tone,
+          company: company || undefined,
+          role: role || undefined,
+          recipient:
+            recipientName || recipientTitle
+              ? {
+                  name: recipientName || undefined,
+                  title: recipientTitle || undefined,
+                }
+              : undefined,
+        },
+        (p) => {
+          setResumeOut(p.resume);
+          setCoverOut(p.coverLetter);
+        },
+        ctrl.signal
+      );
+    } catch (e) {
+      if ((e as { name?: string })?.name !== 'AbortError') {
+        const msg = e instanceof Error ? e.message : 'Generation failed.';
+        setError(msg);
+      }
     } finally {
       setBusy(false);
+      setStreaming(false);
     }
+  }
+
+  function handleCancel() {
+    abortRef.current?.abort();
   }
 
   async function handleSave(status: 'draft' | 'applied') {
@@ -93,7 +144,10 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
         jobDescription: jobDescription.trim(),
         recipient:
           recipientName || recipientTitle
-            ? { name: recipientName || undefined, title: recipientTitle || undefined }
+            ? {
+                name: recipientName || undefined,
+                title: recipientTitle || undefined,
+              }
             : undefined,
         tone,
         generatedResume: resumeOut,
@@ -105,7 +159,6 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
       };
       await saveApplication(app);
       onSaved(app);
-      // Reset for next application
       setCompany('');
       setRole('');
       setName('');
@@ -113,6 +166,7 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
       setRecipientName('');
       setRecipientTitle('');
       setJobDescription('');
+      setJdUrl('');
       setResumeOut('');
       setCoverOut('');
     } finally {
@@ -204,19 +258,36 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
           </label>
         </div>
 
-        <label style={{ display: 'block', marginTop: '1rem' }}>
-          <span style={{ display: 'block', marginBottom: '0.25rem' }}>
+        <div style={{ marginTop: '1rem' }}>
+          <span style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.85rem', color: '#374151', fontWeight: 500 }}>
             Job description
           </span>
+          <div className="row" style={{ marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+            <input
+              type="url"
+              value={jdUrl}
+              onChange={(e) => setJdUrl(e.target.value)}
+              placeholder="Paste a job posting URL to auto-fill below…"
+              style={{ flex: 1, minWidth: 240 }}
+              disabled={fetchingJd}
+            />
+            <button
+              type="button"
+              onClick={handleFetchJd}
+              disabled={!jdUrl.trim() || fetchingJd}
+            >
+              {fetchingJd ? 'Fetching…' : 'Fetch from URL'}
+            </button>
+          </div>
           <textarea
             rows={10}
-            placeholder="Paste the job description here…"
+            placeholder="…or paste the job description here."
             value={jobDescription}
             onChange={(e) => setJobDescription(e.target.value)}
           />
-        </label>
+        </div>
 
-        <div className="row" style={{ marginTop: '0.75rem' }}>
+        <div className="row" style={{ marginTop: '0.75rem', flexWrap: 'wrap' }}>
           <label>
             Tone:&nbsp;
             <select value={tone} onChange={(e) => setTone(e.target.value)}>
@@ -226,42 +297,57 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
               <option value="formal">Formal</option>
             </select>
           </label>
-          <button
-            className="primary"
-            onClick={handleGenerate}
-            disabled={!canGenerate || busy}
-          >
-            {busy ? 'Generating…' : 'Generate'}
-          </button>
+          {!busy ? (
+            <button
+              className="primary"
+              onClick={handleGenerate}
+              disabled={!canGenerate}
+            >
+              Generate
+            </button>
+          ) : (
+            <>
+              <span className="muted">Streaming response…</span>
+              <button onClick={handleCancel}>Cancel</button>
+            </>
+          )}
         </div>
 
         {error && <p className="error">{error}</p>}
       </div>
 
-      {(resumeOut || coverOut) && (
+      {(resumeOut || coverOut || streaming) && (
         <>
-          <OutputPanel resume={resumeOut} coverLetter={coverOut} />
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Save this application</h3>
-            <p className="muted">
-              Saves to your local history so you can track responses later.
-            </p>
-            <div className="row" style={{ flexWrap: 'wrap' }}>
-              <button
-                onClick={() => handleSave('draft')}
-                disabled={!canSave || saving}
-              >
-                Save as draft
-              </button>
-              <button
-                className="primary"
-                onClick={() => handleSave('applied')}
-                disabled={!canSave || saving}
-              >
-                Mark as applied & save
-              </button>
+          <OutputPanel
+            resume={resumeOut}
+            coverLetter={coverOut}
+            originalResume={selectedResume?.text}
+            jobDescription={jobDescription}
+            streaming={streaming}
+          />
+          {!streaming && resumeOut && coverOut && (
+            <div className="card">
+              <h3 style={{ marginTop: 0 }}>Save this application</h3>
+              <p className="muted">
+                Saves to your local history so you can track responses later.
+              </p>
+              <div className="row" style={{ flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => handleSave('draft')}
+                  disabled={!canSave || saving}
+                >
+                  Save as draft
+                </button>
+                <button
+                  className="primary"
+                  onClick={() => handleSave('applied')}
+                  disabled={!canSave || saving}
+                >
+                  Mark as applied & save
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
     </>
