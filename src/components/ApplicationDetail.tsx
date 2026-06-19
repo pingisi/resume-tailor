@@ -156,6 +156,8 @@ export function ApplicationDetail({ application, onBack, onChange }: Props) {
         coverLetter={application.generatedCoverLetter}
         originalResume={originalResume}
         jobDescription={application.jobDescription}
+        company={application.company}
+        role={application.role}
         onEdit={async (kind, next) => {
           const patch =
             kind === 'resume'

@@ -66,6 +66,7 @@ export interface GenerateRequest {
   company?: string;
   role?: string;
   recipient?: ApplicationRecipient;
+  keywords?: string[];
 }
 
 export interface GenerateResponse {

@@ -23,10 +23,30 @@ interface Props {
   streaming?: boolean;
   /** When provided, an Edit tab lets the user modify resume/cover sections in place */
   onEdit?: (kind: 'resume' | 'cover', next: string) => void | Promise<void>;
+  /** Optional metadata used to build descriptive download filenames */
+  company?: string;
+  role?: string;
 }
 
 type Tab = 'resume' | 'cover';
 type Aux = 'preview' | 'ats' | 'diff' | 'edit';
+
+function slug(s: string | undefined): string {
+  if (!s) return '';
+  return s
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function buildSuffix(role?: string, company?: string): string {
+  const r = slug(role);
+  const c = slug(company);
+  if (r && c) return `_${r}_${c}`;
+  if (r) return `_${r}`;
+  if (c) return `_${c}`;
+  return '';
+}
 
 export function OutputPanel({
   resume,
@@ -35,6 +55,8 @@ export function OutputPanel({
   jobDescription,
   streaming,
   onEdit,
+  company,
+  role,
 }: Props) {
   const [tab, setTab] = useState<Tab>('resume');
   const [aux, setAux] = useState<Aux>('preview');
@@ -44,7 +66,8 @@ export function OutputPanel({
 
   const template = TEMPLATES[templateId];
   const active = tab === 'resume' ? resume : coverLetter;
-  const baseName = tab === 'resume' ? 'tailored-resume' : 'cover-letter';
+  const baseName =
+    (tab === 'resume' ? 'Resume' : 'Cover-Letter') + buildSuffix(role, company);
   const html = marked.parse(active || '') as string;
 
   const showAts = tab === 'resume' && !!jobDescription && !!resume;

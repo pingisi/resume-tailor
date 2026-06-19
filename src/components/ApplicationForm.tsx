@@ -4,6 +4,7 @@ import {
   generateDocumentsStream,
   fetchJobDescriptionFromUrl,
 } from '../api/generate';
+import { extractKeywords } from '../lib/keywords';
 import { makeApplicationId, saveApplication } from '../lib/storage';
 import { OutputPanel } from './OutputPanel';
 
@@ -118,6 +119,7 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
                   title: recipientTitle || undefined,
                 }
               : undefined,
+          keywords: extractKeywords(jobDescription, 30),
         },
         (p) => {
           setResumeOut(p.resume);
@@ -339,6 +341,8 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
             originalResume={selectedResume?.text}
             jobDescription={jobDescription}
             streaming={streaming}
+            company={company}
+            role={role}
           />
           {!streaming && resumeOut && coverOut && (
             <div className="card">

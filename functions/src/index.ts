@@ -11,15 +11,37 @@ const COVER_DELIM = '<<<COVER_LETTER>>>';
 
 const SYSTEM_PROMPT = `You are an expert resume writer and career coach.
 You will receive a candidate's existing resume and a job description, plus
-optional company, role title, and hiring-manager information.
+optional company, role title, hiring-manager information, and a list of
+target keywords extracted from the job description.
 
 Your task:
 1. Produce a tailored version of the resume that emphasizes the experience,
-   skills, and accomplishments most relevant to the job description. Keep ALL
-   facts truthful — do NOT invent employers, titles, dates, degrees, or
+   skills, and accomplishments most relevant to the job description. Keep
+   ALL facts truthful — do NOT invent employers, titles, dates, degrees, or
    metrics. You may rephrase, reorder, and re-emphasize.
-2. Produce a matching cover letter (~250-350 words). If a hiring manager name
-   is provided, address it to them ("Dear <Name>,"); otherwise use
+2. Be COMPREHENSIVE. Keep EVERY job, role, and project from the original
+   resume — do NOT drop earlier positions to save space. For each role
+   (current and previous), produce 4-7 detailed bullet points that surface
+   real impact, scope, technologies used, collaboration, and measurable
+   outcomes. Prefer specific, quantified bullets over vague ones. Where the
+   original resume is sparse on a role, expand by paraphrasing implicit
+   responsibilities common to that title — but never invent specific
+   metrics, customers, or named systems that are not implied by the source.
+3. TARGET KEYWORDS: when the user provides a TARGET KEYWORDS list, treat
+   each keyword as a high-value ATS term. For every keyword that genuinely
+   applies to the candidate's background (based on the existing resume),
+   ensure the EXACT keyword text appears verbatim somewhere in the tailored
+   resume — in a bullet, the summary, or a Skills section. Do NOT include a
+   keyword that has no truthful connection to the candidate's experience. A
+   Skills / Technologies / Tools section is encouraged to collect the
+   relevant keywords compactly.
+4. Structure: start with a 2-3 sentence professional summary tailored to
+   the role, then a "## Skills" section listing relevant technologies/tools
+   (one line, comma-separated or bulleted), then "## Experience" with one
+   subsection per role using "### Role — Company (dates)", then
+   "## Education" and any other original sections.
+5. Produce a matching cover letter (~250-350 words). If a hiring manager
+   name is provided, address it to them ("Dear <Name>,"); otherwise use
    "Dear Hiring Team,". Reference the company by name when known. Reference
    specific requirements from the job description and how the candidate's
    background meets them.
@@ -48,9 +70,14 @@ interface Body {
   company?: string;
   role?: string;
   recipient?: Recipient;
+  keywords?: string[];
 }
 
 function buildPrompt(b: Body): string {
+  const kws = (b.keywords || [])
+    .map((k) => k.trim())
+    .filter((k) => k.length > 0)
+    .slice(0, 40);
   const parts: (string | null)[] = [
     `Tone: ${(b.tone || 'professional').trim()}`,
     b.company ? `Company: ${b.company.trim()}` : null,
@@ -59,6 +86,9 @@ function buildPrompt(b: Body): string {
       ? `Hiring manager: ${b.recipient.name.trim()}${
           b.recipient.title ? ` (${b.recipient.title.trim()})` : ''
         }`
+      : null,
+    kws.length
+      ? `\n=== TARGET KEYWORDS (include verbatim where truthful) ===\n${kws.join(', ')}`
       : null,
     '',
     '=== EXISTING RESUME ===',
