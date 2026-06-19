@@ -1,0 +1,163 @@
+import { useEffect, useRef, useState } from 'react';
+import type { Application, ApplicationStatus } from '../types';
+import {
+  APPLICATION_STATUSES,
+  deleteApplication,
+  updateApplication,
+} from '../lib/storage';
+import { OutputPanel } from './OutputPanel';
+import { StatusBadge } from './StatusBadge';
+
+interface Props {
+  application: Application;
+  onBack: () => void;
+  onChange: (app: Application | null) => void;
+}
+
+export function ApplicationDetail({ application, onBack, onChange }: Props) {
+  const [notes, setNotes] = useState(application.notes ?? '');
+  const notesTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    setNotes(application.notes ?? '');
+  }, [application.id, application.notes]);
+
+  useEffect(() => {
+    if (notes === (application.notes ?? '')) return;
+    if (notesTimer.current) window.clearTimeout(notesTimer.current);
+    notesTimer.current = window.setTimeout(async () => {
+      const updated = await updateApplication(application.id, { notes });
+      if (updated) onChange(updated);
+    }, 500);
+    return () => {
+      if (notesTimer.current) window.clearTimeout(notesTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes]);
+
+  async function handleStatusChange(status: ApplicationStatus) {
+    const updated = await updateApplication(application.id, { status });
+    if (updated) onChange(updated);
+  }
+
+  async function handleDelete() {
+    const ok = confirm(`Delete application "${application.name}"?`);
+    if (!ok) return;
+    await deleteApplication(application.id);
+    onChange(null);
+  }
+
+  return (
+    <>
+      <div className="card">
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <div>
+            <button onClick={onBack}>← Back</button>
+          </div>
+          <button className="danger" onClick={handleDelete}>
+            Delete
+          </button>
+        </div>
+
+        <h2 style={{ marginTop: '1rem' }}>
+          {application.name} <StatusBadge status={application.status} />
+        </h2>
+
+        <div className="meta-grid">
+          {application.company && (
+            <div>
+              <span className="meta-label">Company</span>
+              <span>{application.company}</span>
+            </div>
+          )}
+          {application.role && (
+            <div>
+              <span className="meta-label">Role</span>
+              <span>{application.role}</span>
+            </div>
+          )}
+          <div>
+            <span className="meta-label">Resume used</span>
+            <span>{application.resumeName}</span>
+          </div>
+          <div>
+            <span className="meta-label">Created</span>
+            <span>{formatDateTime(application.createdAt)}</span>
+          </div>
+          {application.appliedAt && (
+            <div>
+              <span className="meta-label">Applied on</span>
+              <span>{formatDateTime(application.appliedAt)}</span>
+            </div>
+          )}
+          {application.recipient?.name && (
+            <div>
+              <span className="meta-label">Hiring manager</span>
+              <span>
+                {application.recipient.name}
+                {application.recipient.title
+                  ? ` (${application.recipient.title})`
+                  : ''}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="row" style={{ marginTop: '1rem' }}>
+          <label>
+            Status:&nbsp;
+            <select
+              value={application.status}
+              onChange={(e) =>
+                handleStatusChange(e.target.value as ApplicationStatus)
+              }
+            >
+              {APPLICATION_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <label style={{ display: 'block', marginTop: '1rem' }}>
+          <span style={{ display: 'block', marginBottom: '0.25rem' }}>
+            Notes
+          </span>
+          <textarea
+            rows={3}
+            placeholder="Interview times, contacts, follow-ups…"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+          <span className="muted" style={{ fontSize: '0.8rem' }}>
+            Auto-saves
+          </span>
+        </label>
+      </div>
+
+      <OutputPanel
+        resume={application.generatedResume}
+        coverLetter={application.generatedCoverLetter}
+      />
+
+      <details className="card">
+        <summary>Original job description</summary>
+        <pre className="resume-text" style={{ marginTop: '1rem' }}>
+          {application.jobDescription}
+        </pre>
+      </details>
+    </>
+  );
+}
+
+function formatDateTime(ts: number): string {
+  return new Date(ts).toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}

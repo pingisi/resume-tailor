@@ -1,13 +1,12 @@
 import { useRef, useState } from 'react';
 import { parseResumeFile } from '../lib/parseResume';
-import { saveResume } from '../lib/storage';
 
 interface Props {
-  currentFileName?: string;
-  onLoaded: (text: string, fileName: string) => void;
+  label?: string;
+  onParsed: (text: string, fileName: string) => void | Promise<void>;
 }
 
-export function ResumeUpload({ currentFileName, onLoaded }: Props) {
+export function ResumeFilePicker({ label = 'Upload resume', onParsed }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,22 +17,17 @@ export function ResumeUpload({ currentFileName, onLoaded }: Props) {
     try {
       const text = await parseResumeFile(file);
       if (!text.trim()) throw new Error('No text extracted from the file.');
-      await saveResume(file.name, text);
-      onLoaded(text, file.name);
+      await onParsed(text, file.name);
     } catch (e: any) {
       setError(e?.message || 'Failed to parse file.');
     } finally {
       setBusy(false);
+      if (inputRef.current) inputRef.current.value = '';
     }
   }
 
   return (
-    <div className="card">
-      <h2>1. Your resume</h2>
-      <p className="muted">
-        Upload PDF, DOCX, or TXT. It stays in your browser (IndexedDB) — never
-        uploaded to a server.
-      </p>
+    <>
       <input
         ref={inputRef}
         type="file"
@@ -49,14 +43,9 @@ export function ResumeUpload({ currentFileName, onLoaded }: Props) {
         onClick={() => inputRef.current?.click()}
         disabled={busy}
       >
-        {busy ? 'Parsing…' : currentFileName ? 'Replace resume' : 'Upload resume'}
+        {busy ? 'Parsing…' : label}
       </button>
-      {currentFileName && (
-        <span className="muted" style={{ marginLeft: '0.75rem' }}>
-          Loaded: <strong>{currentFileName}</strong>
-        </span>
-      )}
       {error && <p className="error">{error}</p>}
-    </div>
+    </>
   );
 }

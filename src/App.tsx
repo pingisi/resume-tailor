@@ -1,90 +1,114 @@
-import { useEffect, useState } from 'react';
-import { ResumeUpload } from './components/ResumeUpload';
-import { JobInput } from './components/JobInput';
-import { OutputPanel } from './components/OutputPanel';
-import { loadResume } from './lib/storage';
-import { generateDocuments } from './api/generate';
+import { useCallback, useEffect, useState } from 'react';
+import { ApplicationDetail } from './components/ApplicationDetail';
+import { ApplicationForm } from './components/ApplicationForm';
+import { ApplicationList } from './components/ApplicationList';
+import { ResumeManager } from './components/ResumeManager';
+import { TabNav, type TabKey } from './components/TabNav';
+import {
+  getApplication,
+  listApplications,
+  listResumes,
+} from './lib/storage';
+import type { Application, StoredResume } from './types';
 import './App.css';
 
 export default function App() {
-  const [resumeText, setResumeText] = useState('');
-  const [resumeFileName, setResumeFileName] = useState<string>();
-  const [job, setJob] = useState('');
-  const [tone, setTone] = useState('professional');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [resumeOut, setResumeOut] = useState('');
-  const [coverOut, setCoverOut] = useState('');
+  const [tab, setTab] = useState<TabKey>('new');
+  const [resumes, setResumes] = useState<StoredResume[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
+  const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    void loadResume().then((r) => {
-      if (r) {
-        setResumeText(r.text);
-        setResumeFileName(r.fileName);
-      }
-    });
+  const refreshResumes = useCallback(async () => {
+    setResumes(await listResumes());
   }, []);
 
-  async function handleGenerate() {
-    setBusy(true);
-    setError(null);
-    setResumeOut('');
-    setCoverOut('');
-    try {
-      const out = await generateDocuments({
-        resumeText,
-        jobDescription: job,
-        tone,
-      });
-      setResumeOut(out.resume);
-      setCoverOut(out.coverLetter);
-    } catch (e: any) {
-      setError(e?.message || 'Generation failed.');
-    } finally {
-      setBusy(false);
-    }
-  }
+  const refreshApplications = useCallback(async () => {
+    setApplications(await listApplications());
+  }, []);
 
-  const canGenerate = resumeText.trim().length > 50 && job.trim().length > 30;
+  useEffect(() => {
+    void (async () => {
+      await Promise.all([refreshResumes(), refreshApplications()]);
+      setLoaded(true);
+    })();
+  }, [refreshResumes, refreshApplications]);
+
+  useEffect(() => {
+    if (!selectedAppId) {
+      setSelectedApp(null);
+      return;
+    }
+    void getApplication(selectedAppId).then((a) => setSelectedApp(a ?? null));
+  }, [selectedAppId, applications]);
+
+  // Land on Resumes tab if user has no resumes yet
+  useEffect(() => {
+    if (loaded && resumes.length === 0 && tab === 'new') {
+      setTab('resumes');
+    }
+  }, [loaded, resumes.length, tab]);
+
+  const defaultResume = resumes.find((r) => r.isDefault) ?? resumes[0];
 
   return (
     <div className="app">
       <header>
         <h1>Resume Tailor</h1>
         <p className="muted">
-          Tailor your existing resume and write a matching cover letter from a
-          job description.
+          Tailor your resume + cover letter per job, and track every application.
         </p>
       </header>
 
-      <ResumeUpload
-        currentFileName={resumeFileName}
-        onLoaded={(text, name) => {
-          setResumeText(text);
-          setResumeFileName(name);
+      <TabNav
+        active={tab}
+        onChange={(k) => {
+          setSelectedAppId(null);
+          setTab(k);
         }}
+        applicationCount={applications.length}
+        resumeCount={resumes.length}
       />
 
-      <JobInput
-        value={job}
-        onChange={setJob}
-        tone={tone}
-        onToneChange={setTone}
-        onGenerate={handleGenerate}
-        canGenerate={canGenerate}
-        busy={busy}
-      />
+      {tab === 'new' && (
+        <ApplicationForm
+          resumes={resumes}
+          defaultResumeId={defaultResume?.id}
+          onSaved={async (app) => {
+            await refreshApplications();
+            setSelectedAppId(app.id);
+            setTab('applications');
+          }}
+        />
+      )}
 
-      {error && <div className="card error">{error}</div>}
+      {tab === 'applications' && !selectedApp && (
+        <ApplicationList
+          applications={applications}
+          onOpen={(id) => setSelectedAppId(id)}
+        />
+      )}
 
-      {(resumeOut || coverOut) && (
-        <OutputPanel resume={resumeOut} coverLetter={coverOut} />
+      {tab === 'applications' && selectedApp && (
+        <ApplicationDetail
+          application={selectedApp}
+          onBack={() => setSelectedAppId(null)}
+          onChange={async (updated) => {
+            await refreshApplications();
+            if (updated === null) setSelectedAppId(null);
+            else setSelectedApp(updated);
+          }}
+        />
+      )}
+
+      {tab === 'resumes' && (
+        <ResumeManager resumes={resumes} onChange={refreshResumes} />
       )}
 
       <footer className="muted">
-        Your resume is stored locally in your browser (IndexedDB). The job
-        description and resume text are sent only to the AI provider via a
-        Firebase Cloud Function.
+        Everything stays in your browser (IndexedDB). The resume + job
+        description are sent to the AI only when you click Generate.
       </footer>
     </div>
   );

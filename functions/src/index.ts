@@ -7,15 +7,19 @@ const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
 const MODEL = 'gemini-2.5-flash';
 
 const SYSTEM_PROMPT = `You are an expert resume writer and career coach.
-You will receive a candidate's existing resume and a job description.
+You will receive a candidate's existing resume and a job description, plus
+optional company, role title, and hiring-manager information.
+
 Your task:
 1. Produce a tailored version of the resume that emphasizes the experience,
    skills, and accomplishments most relevant to the job description. Keep ALL
    facts truthful — do NOT invent employers, titles, dates, degrees, or
    metrics. You may rephrase, reorder, and re-emphasize.
-2. Produce a matching cover letter (~250-350 words) addressed to the hiring
-   team, referencing specific requirements from the job description and how
-   the candidate's background meets them.
+2. Produce a matching cover letter (~250-350 words). If a hiring manager name
+   is provided, address it to them ("Dear <Name>,"); otherwise use
+   "Dear Hiring Team,". Reference the company by name when known. Reference
+   specific requirements from the job description and how the candidate's
+   background meets them.
 
 Return STRICT JSON with this shape and nothing else:
 {
@@ -24,10 +28,18 @@ Return STRICT JSON with this shape and nothing else:
 }
 Use clean Markdown headings (##) for resume sections.`;
 
+interface Recipient {
+  name?: string;
+  title?: string;
+}
+
 interface Body {
   resumeText?: string;
   jobDescription?: string;
   tone?: string;
+  company?: string;
+  role?: string;
+  recipient?: Recipient;
 }
 
 export const generate = onRequest(
@@ -48,6 +60,10 @@ export const generate = onRequest(
     const resumeText = (body.resumeText || '').trim();
     const jobDescription = (body.jobDescription || '').trim();
     const tone = (body.tone || 'professional').trim();
+    const company = (body.company || '').trim();
+    const role = (body.role || '').trim();
+    const recipientName = (body.recipient?.name || '').trim();
+    const recipientTitle = (body.recipient?.title || '').trim();
 
     if (resumeText.length < 50 || jobDescription.length < 30) {
       res.status(400).json({ error: 'Resume or job description too short.' });
@@ -69,15 +85,21 @@ export const generate = onRequest(
         },
       });
 
-      const userPrompt = [
+      const promptLines: (string | null)[] = [
         `Tone: ${tone}`,
+        company ? `Company: ${company}` : null,
+        role ? `Target role: ${role}` : null,
+        recipientName
+          ? `Hiring manager: ${recipientName}${recipientTitle ? ` (${recipientTitle})` : ''}`
+          : null,
         '',
         '=== EXISTING RESUME ===',
         resumeText,
         '',
         '=== JOB DESCRIPTION ===',
         jobDescription,
-      ].join('\n');
+      ];
+      const userPrompt = promptLines.filter((l) => l !== null).join('\n');
 
       const result = await model.generateContent(userPrompt);
       const text = result.response.text();
