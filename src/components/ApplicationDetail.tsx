@@ -9,7 +9,6 @@ import {
 import { OutputPanel } from './OutputPanel';
 import { StatusBadge } from './StatusBadge';
 import { InterviewPrep } from './InterviewPrep';
-import { GmailSync } from './GmailSync';
 
 interface Props {
   application: Application;
@@ -173,8 +172,6 @@ export function ApplicationDetail({ application, onBack, onChange }: Props) {
         highlight={application.status === 'interview'}
         onChange={onChange}
       />
-
-      <GmailSync application={application} onChange={(a) => onChange(a)} />
 
       <details className="card">
         <summary>Original job description</summary>
