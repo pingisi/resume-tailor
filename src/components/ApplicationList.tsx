@@ -30,9 +30,13 @@ export function ApplicationList({ applications, onOpen }: Props) {
       <h2>Applications</h2>
 
       {applications.length === 0 ? (
-        <p className="muted">
-          No applications yet. Generate one from the <strong>New application</strong> tab.
-        </p>
+        <div className="empty-state">
+          <div className="empty-state-icon">📭</div>
+          <p className="empty-state-title">No applications yet</p>
+          <p className="empty-state-hint">
+            Generate your first tailored resume from the <strong>New application</strong> tab.
+          </p>
+        </div>
       ) : (
         <>
           <div className="filter-row">

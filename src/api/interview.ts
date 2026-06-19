@@ -1,4 +1,5 @@
 import type { InterviewQuestion } from '../types';
+import { record as recordQuota } from '../lib/quota';
 
 const ENDPOINT =
   import.meta.env.VITE_INTERVIEW_URL || '/api/prepare-interview';
@@ -33,5 +34,6 @@ export async function prepareInterview(
     }
     throw new Error(`Interview prep failed (${res.status}): ${msg}`);
   }
+  recordQuota('interview');
   return res.json();
 }

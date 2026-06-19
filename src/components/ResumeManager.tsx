@@ -100,9 +100,13 @@ export function ResumeManager({ resumes, onChange }: Props) {
       </div>
 
       {resumes.length === 0 ? (
-        <p className="muted" style={{ marginTop: '1rem' }}>
-          No resumes yet. Upload one above.
-        </p>
+        <div className="empty-state">
+          <div className="empty-state-icon">📄</div>
+          <p className="empty-state-title">No resumes yet</p>
+          <p className="empty-state-hint">
+            Upload a PDF, DOCX, or TXT above to get started.
+          </p>
+        </div>
       ) : (
         <table className="data-table">
           <thead>

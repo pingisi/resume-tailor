@@ -59,20 +59,16 @@ export function OutputPanel({
 
   function exportPdf() {
     setExporting('pdf');
-    try {
-      downloadPdf(baseName, active, template);
-    } finally {
+    void downloadPdf(baseName, active, template).finally(() => {
       setExporting(null);
-    }
+    });
   }
 
-  async function exportDocx() {
+  function exportDocx() {
     setExporting('docx');
-    try {
-      await downloadDocx(baseName, active, template);
-    } finally {
+    void downloadDocx(baseName, active, template).finally(() => {
       setExporting(null);
-    }
+    });
   }
 
   const previewStyle: CSSProperties = {

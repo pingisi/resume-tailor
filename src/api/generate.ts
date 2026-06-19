@@ -1,4 +1,5 @@
 import type { GenerateRequest, GenerateResponse } from '../types';
+import { record as recordQuota } from '../lib/quota';
 
 const ENDPOINT =
   import.meta.env.VITE_GENERATE_URL || '/api/generate';
@@ -39,6 +40,7 @@ export async function generateDocumentsStream(
       `Generation failed (${res.status}): ${text || res.statusText}`
     );
   }
+  recordQuota('generate');
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

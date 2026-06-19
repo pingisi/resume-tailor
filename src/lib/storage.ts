@@ -204,3 +204,31 @@ export const APPLICATION_STATUSES: ApplicationStatus[] = [
   'rejected',
   'withdrawn',
 ];
+
+// ---------- Bulk / backup ----------
+
+export async function clearResumes(): Promise<void> {
+  const db = await getDB();
+  await db.clear(RESUMES);
+}
+
+export async function clearApplications(): Promise<void> {
+  const db = await getDB();
+  await db.clear(APPLICATIONS);
+}
+
+export async function bulkPutResumes(items: StoredResume[]): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction(RESUMES, 'readwrite');
+  const store = tx.objectStore(RESUMES);
+  for (const r of items) await store.put(r);
+  await tx.done;
+}
+
+export async function bulkPutApplications(items: Application[]): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction(APPLICATIONS, 'readwrite');
+  const store = tx.objectStore(APPLICATIONS);
+  for (const a of items) await store.put(a);
+  await tx.done;
+}

@@ -2,8 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApplicationDetail } from './components/ApplicationDetail';
 import { ApplicationForm } from './components/ApplicationForm';
 import { ApplicationList } from './components/ApplicationList';
+import { BackupPanel } from './components/BackupPanel';
+import { QuotaBar } from './components/QuotaBar';
 import { ResumeManager } from './components/ResumeManager';
 import { TabNav, type TabKey } from './components/TabNav';
+import { ThemeToggle } from './components/ThemeToggle';
+import { useShortcuts } from './hooks/useShortcuts';
 import {
   getApplication,
   listApplications,
@@ -52,13 +56,44 @@ export default function App() {
 
   const defaultResume = resumes.find((r) => r.isDefault) ?? resumes[0];
 
+  useShortcuts({
+    Escape: () => {
+      if (selectedAppId) setSelectedAppId(null);
+    },
+    n: () => {
+      setSelectedAppId(null);
+      setTab('new');
+    },
+    a: () => {
+      setSelectedAppId(null);
+      setTab('applications');
+    },
+    r: () => {
+      setSelectedAppId(null);
+      setTab('resumes');
+    },
+    '?': () => {
+      alert(
+        'Keyboard shortcuts:\n' +
+          '  n — new application\n' +
+          '  a — applications list\n' +
+          '  r — resumes\n' +
+          '  Esc — back to list\n' +
+          '  ? — this help'
+      );
+    },
+  });
+
   return (
     <div className="app">
-      <header>
-        <h1>Resume Tailor</h1>
-        <p className="muted">
-          Tailor your resume + cover letter per job, and track every application.
-        </p>
+      <header className="app-header">
+        <div>
+          <h1>Resume Tailor</h1>
+          <p className="muted">
+            Tailor your resume + cover letter per job, and track every application.
+          </p>
+        </div>
+        <ThemeToggle />
       </header>
 
       <TabNav
@@ -103,8 +138,17 @@ export default function App() {
       )}
 
       {tab === 'resumes' && (
-        <ResumeManager resumes={resumes} onChange={refreshResumes} />
+        <>
+          <ResumeManager resumes={resumes} onChange={refreshResumes} />
+          <BackupPanel
+            onImported={async () => {
+              await Promise.all([refreshResumes(), refreshApplications()]);
+            }}
+          />
+        </>
       )}
+
+      <QuotaBar />
 
       <footer className="muted">
         Everything stays in your browser (IndexedDB). The resume + job
