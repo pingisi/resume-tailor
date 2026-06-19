@@ -56,7 +56,18 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
     jobDescription.trim().length > 30 &&
     !busy;
 
-  const canSave = !!resumeOut && !!coverOut && !!name.trim();
+  const canSave = !!resumeOut && !!coverOut;
+
+  function effectiveName(): string {
+    const n = name.trim();
+    if (n) return n;
+    const r = role.trim();
+    const c = company.trim();
+    if (r && c) return `${r} @ ${c}`;
+    if (r) return r;
+    if (c) return c;
+    return `Application ${new Date().toLocaleDateString()}`;
+  }
 
   async function handleFetchJd() {
     if (!jdUrl.trim()) return;
@@ -132,11 +143,12 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
   async function handleSave(status: 'draft' | 'applied') {
     if (!selectedResume || !canSave) return;
     setSaving(true);
+    setError(null);
     try {
       const now = Date.now();
       const app: Application = {
         id: makeApplicationId(),
-        name: name.trim(),
+        name: effectiveName(),
         company: company.trim(),
         role: role.trim(),
         resumeId: selectedResume.id,
@@ -169,6 +181,9 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
       setJdUrl('');
       setResumeOut('');
       setCoverOut('');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Save failed.';
+      setError(msg);
     } finally {
       setSaving(false);
     }
