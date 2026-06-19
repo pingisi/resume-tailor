@@ -1,5 +1,12 @@
 {
   "projects": {
-    "default": "REPLACE_WITH_YOUR_FIREBASE_PROJECT_ID"
+    "default": "camping-planner-db061"
+  },
+  "targets": {
+    "camping-planner-db061": {
+      "hosting": {
+        "resume-tailor": ["resume-tailor-pingisi"]
+      }
+    }
   }
 }

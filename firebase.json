@@ -1,12 +1,15 @@
 {
-  "hosting": {
-    "public": "dist",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [
-      { "source": "/api/generate", "function": "generate" },
-      { "source": "**", "destination": "/index.html" }
-    ]
-  },
+  "hosting": [
+    {
+      "target": "resume-tailor",
+      "public": "dist",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [
+        { "source": "/api/generate", "function": "generate" },
+        { "source": "**", "destination": "/index.html" }
+      ]
+    }
+  ],
   "functions": [
     {
       "source": "functions",
