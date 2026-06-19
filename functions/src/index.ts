@@ -283,3 +283,119 @@ export const fetchJd = onRequest(
     }
   }
 );
+
+// ---------- Interview prep ----------
+
+const INTERVIEW_SYSTEM_PROMPT = `You are an expert interview coach.
+Given a candidate's resume and a job description, produce a focused interview
+prep guide of 10-12 likely questions across these categories:
+
+- "technical"     (max ~5) — hands-on skills the JD requires
+- "behavioral"    (max ~3) — STAR-style soft-skill / leadership questions
+- "role-specific" (max ~3) — scenarios tied to the company/team/product
+- "culture"       (max ~2) — values, working-style, motivation questions
+
+For EACH question, return:
+- "category": one of the four strings above
+- "question": the question text
+- "why": ONE sentence on why an interviewer would ask this for THIS role
+- "talkingPoints": 2-4 short bullet points the candidate could use as an
+   answer, drawn from their ACTUAL resume. NEVER invent experiences the
+   resume does not contain. If the resume lacks coverage, write a bullet
+   like "Acknowledge gap and connect to closest adjacent experience: ..."
+
+Return STRICT JSON of this exact shape and nothing else:
+{
+  "questions": [
+    {
+      "category": "technical|behavioral|role-specific|culture",
+      "question": "...",
+      "why": "...",
+      "talkingPoints": ["...", "..."]
+    }
+  ]
+}`;
+
+interface InterviewBody {
+  resumeText?: string;
+  jobDescription?: string;
+  company?: string;
+  role?: string;
+}
+
+export const prepareInterview = onRequest(
+  {
+    cors: true,
+    secrets: [GEMINI_API_KEY],
+    timeoutSeconds: 120,
+    memory: '512MiB',
+    region: 'us-central1',
+  },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method not allowed' });
+      return;
+    }
+
+    const body = (req.body || {}) as InterviewBody;
+    const resumeText = (body.resumeText || '').trim();
+    const jobDescription = (body.jobDescription || '').trim();
+    const company = (body.company || '').trim();
+    const role = (body.role || '').trim();
+
+    if (resumeText.length < 50 || jobDescription.length < 30) {
+      res.status(400).json({ error: 'Resume or job description too short.' });
+      return;
+    }
+    if (resumeText.length > 30000 || jobDescription.length > 15000) {
+      res.status(413).json({ error: 'Input too large.' });
+      return;
+    }
+
+    try {
+      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY.value());
+      const model = genAI.getGenerativeModel({
+        model: MODEL,
+        systemInstruction: INTERVIEW_SYSTEM_PROMPT,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.5,
+        },
+      });
+
+      const lines: (string | null)[] = [
+        company ? `Company: ${company}` : null,
+        role ? `Target role: ${role}` : null,
+        '',
+        '=== CANDIDATE RESUME ===',
+        resumeText,
+        '',
+        '=== JOB DESCRIPTION ===',
+        jobDescription,
+      ];
+      const prompt = lines.filter((l) => l !== null).join('\n');
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+
+      let parsed: { questions?: unknown };
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        res.status(502).json({ error: 'Model returned non-JSON.', raw: text.substring(0, 200) });
+        return;
+      }
+
+      const questions = Array.isArray(parsed.questions) ? parsed.questions : [];
+      if (questions.length === 0) {
+        res.status(502).json({ error: 'Model returned no questions.' });
+        return;
+      }
+      res.json({ questions });
+    } catch (err) {
+      const e = err as { message?: string };
+      console.error('prepareInterview error', err);
+      res.status(500).json({ error: e?.message || 'Internal error' });
+    }
+  }
+);

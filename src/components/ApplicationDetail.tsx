@@ -8,6 +8,7 @@ import {
 } from '../lib/storage';
 import { OutputPanel } from './OutputPanel';
 import { StatusBadge } from './StatusBadge';
+import { InterviewPrep } from './InterviewPrep';
 
 interface Props {
   application: Application;
@@ -155,6 +156,13 @@ export function ApplicationDetail({ application, onBack, onChange }: Props) {
         coverLetter={application.generatedCoverLetter}
         originalResume={originalResume}
         jobDescription={application.jobDescription}
+      />
+
+      <InterviewPrep
+        application={application}
+        originalResume={originalResume}
+        highlight={application.status === 'interview'}
+        onChange={onChange}
       />
 
       <details className="card">

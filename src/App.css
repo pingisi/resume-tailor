@@ -324,6 +324,82 @@ header h1 {
 .diff-rem .diff-marker { color: #dc2626; }
 .diff-eq { color: #374151; }
 
+/* ---------- Interview prep ---------- */
+.card-highlight {
+  border-color: #fcd34d;
+  background: linear-gradient(0deg, #fffbeb, white);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.12);
+}
+.qlist {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.qcard {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  overflow: hidden;
+}
+.qhead {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  border-radius: 0;
+}
+.qhead:hover { background: #f9fafb; }
+.qtext { flex: 1; color: #111827; }
+.qchevron { color: #9ca3af; font-size: 0.85rem; }
+.cat-pill {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.cat-pill-technical     { background: #dbeafe; color: #1e40af; }
+.cat-pill-behavioral    { background: #ede9fe; color: #5b21b6; }
+.cat-pill-role-specific { background: #fef3c7; color: #92400e; }
+.cat-pill-culture       { background: #d1fae5; color: #065f46; }
+.qbody {
+  padding: 0 0.8rem 0.8rem 0.8rem;
+  border-top: 1px solid #f3f4f6;
+}
+.qwhy {
+  font-size: 0.85rem;
+  color: #4b5563;
+  margin: 0.6rem 0 0.4rem;
+}
+.qtalk-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  margin: 0.5rem 0 0.25rem;
+}
+.qtalk {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #111827;
+}
+.qtalk li { margin: 0.25rem 0; }
+
 footer {
   text-align: center;
   margin-top: 1rem;

@@ -7,6 +7,7 @@
       "rewrites": [
         { "source": "/api/generate", "function": "generate" },
         { "source": "/api/fetch-jd", "function": "fetchJd" },
+        { "source": "/api/prepare-interview", "function": "prepareInterview" },
         { "source": "**", "destination": "/index.html" }
       ]
     }

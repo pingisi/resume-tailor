@@ -21,6 +21,24 @@ export interface ApplicationRecipient {
   title?: string;
 }
 
+export type InterviewCategory =
+  | 'technical'
+  | 'behavioral'
+  | 'role-specific'
+  | 'culture';
+
+export interface InterviewQuestion {
+  category: InterviewCategory;
+  question: string;
+  why: string;
+  talkingPoints: string[];
+}
+
+export interface InterviewPrep {
+  generatedAt: number;
+  questions: InterviewQuestion[];
+}
+
 export interface Application {
   id: string;
   name: string;
@@ -35,6 +53,7 @@ export interface Application {
   generatedCoverLetter: string;
   status: ApplicationStatus;
   notes?: string;
+  interviewPrep?: InterviewPrep;
   createdAt: number;
   updatedAt: number;
   appliedAt?: number;
