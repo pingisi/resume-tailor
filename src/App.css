@@ -80,6 +80,82 @@ header h1 {
 .preview h3 { font-size: 0.95rem; }
 .preview p, .preview li { line-height: 1.55; }
 
+/* ---------- Template variants ---------- */
+.preview-modern h1 { color: var(--accent, #2563eb); letter-spacing: -0.01em; }
+.preview-modern h2 {
+  color: var(--accent, #2563eb);
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+}
+.preview-modern h3 { font-size: 0.95rem; }
+.preview-modern p, .preview-modern li { line-height: 1.5; }
+
+.preview-classic h1 {
+  text-align: center;
+  font-size: 1.4rem;
+  letter-spacing: 0.02em;
+}
+.preview-classic h2 {
+  text-transform: uppercase;
+  border-bottom: 1px solid #111;
+  padding-bottom: 0.15rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+}
+.preview-classic h3 { font-style: italic; font-weight: 600; }
+.preview-classic p, .preview-classic li { line-height: 1.45; }
+
+.preview-compact { font-size: 0.85rem; }
+.preview-compact h1 { font-size: 1.05rem; }
+.preview-compact h2 {
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  color: var(--accent, #374151);
+  border-bottom: 1px solid #d1d5db;
+  padding-bottom: 0.1rem;
+  letter-spacing: 0.06em;
+  margin-top: 0.8rem;
+}
+.preview-compact h3 { font-size: 0.85rem; }
+.preview-compact p, .preview-compact li { line-height: 1.35; margin: 0.25rem 0; }
+
+/* ---------- Template picker ---------- */
+.template-row {
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.template-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.template-pills {
+  display: flex;
+  gap: 0.25rem;
+  background: #f3f4f6;
+  padding: 0.2rem;
+  border-radius: 8px;
+}
+.template-pill {
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  color: #4b5563;
+}
+.template-pill:hover { background: rgba(255, 255, 255, 0.6); }
+.template-pill.active {
+  background: white;
+  color: #111827;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  font-weight: 600;
+}
+
 footer {
   text-align: center;
   margin-top: 1rem;
