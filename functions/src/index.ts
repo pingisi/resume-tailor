@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
 
-const MODEL = 'gemini-2.0-flash';
+const MODEL = 'gemini-2.5-flash';
 
 const SYSTEM_PROMPT = `You are an expert resume writer and career coach.
 You will receive a candidate's existing resume and a job description.
