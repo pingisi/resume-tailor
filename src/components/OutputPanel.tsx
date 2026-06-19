@@ -10,6 +10,7 @@ import {
 } from '../lib/templates';
 import { AtsScore } from './AtsScore';
 import { DiffView } from './DiffView';
+import { SectionEditor } from './SectionEditor';
 
 interface Props {
   resume: string;
@@ -20,10 +21,12 @@ interface Props {
   jobDescription?: string;
   /** When true, the panel renders even with partial / empty content (used while streaming) */
   streaming?: boolean;
+  /** When provided, an Edit tab lets the user modify resume/cover sections in place */
+  onEdit?: (kind: 'resume' | 'cover', next: string) => void | Promise<void>;
 }
 
 type Tab = 'resume' | 'cover';
-type Aux = 'preview' | 'ats' | 'diff';
+type Aux = 'preview' | 'ats' | 'diff' | 'edit';
 
 export function OutputPanel({
   resume,
@@ -31,6 +34,7 @@ export function OutputPanel({
   originalResume,
   jobDescription,
   streaming,
+  onEdit,
 }: Props) {
   const [tab, setTab] = useState<Tab>('resume');
   const [aux, setAux] = useState<Aux>('preview');
@@ -78,7 +82,9 @@ export function OutputPanel({
 
   // Reset aux to preview when switching to cover letter (no ATS/diff there)
   const effectiveAux: Aux =
-    tab === 'cover' && aux !== 'preview' ? 'preview' : aux;
+    tab === 'cover' && (aux === 'ats' || aux === 'diff') ? 'preview' : aux;
+
+  const showEdit = !!onEdit && !streaming && !!active;
 
   return (
     <div className="card">
@@ -101,7 +107,7 @@ export function OutputPanel({
         </button>
       </div>
 
-      {tab === 'resume' && (showAts || showDiff) && (
+      {tab === 'resume' && (showAts || showDiff || showEdit) && (
         <div className="aux-tabs">
           <button
             type="button"
@@ -128,6 +134,34 @@ export function OutputPanel({
               Diff
             </button>
           )}
+          {showEdit && (
+            <button
+              type="button"
+              className={'aux-tab' + (effectiveAux === 'edit' ? ' active' : '')}
+              onClick={() => setAux('edit')}
+            >
+              Edit
+            </button>
+          )}
+        </div>
+      )}
+
+      {tab === 'cover' && showEdit && (
+        <div className="aux-tabs">
+          <button
+            type="button"
+            className={'aux-tab' + (effectiveAux === 'preview' ? ' active' : '')}
+            onClick={() => setAux('preview')}
+          >
+            Preview
+          </button>
+          <button
+            type="button"
+            className={'aux-tab' + (effectiveAux === 'edit' ? ' active' : '')}
+            onClick={() => setAux('edit')}
+          >
+            Edit
+          </button>
         </div>
       )}
 
@@ -160,6 +194,12 @@ export function OutputPanel({
       )}
       {effectiveAux === 'diff' && originalResume && (
         <DiffView original={originalResume} tailored={resume} />
+      )}
+      {effectiveAux === 'edit' && onEdit && (
+        <SectionEditor
+          content={active}
+          onSave={(next) => onEdit(tab, next)}
+        />
       )}
 
       <div className="row" style={{ marginTop: '0.75rem', flexWrap: 'wrap' }}>

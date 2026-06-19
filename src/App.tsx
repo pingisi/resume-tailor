@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Analytics } from './components/Analytics';
 import { ApplicationDetail } from './components/ApplicationDetail';
 import { ApplicationForm } from './components/ApplicationForm';
 import { ApplicationList } from './components/ApplicationList';
@@ -72,12 +73,17 @@ export default function App() {
       setSelectedAppId(null);
       setTab('resumes');
     },
+    s: () => {
+      setSelectedAppId(null);
+      setTab('analytics');
+    },
     '?': () => {
       alert(
         'Keyboard shortcuts:\n' +
           '  n — new application\n' +
           '  a — applications list\n' +
           '  r — resumes\n' +
+          '  s — analytics\n' +
           '  Esc — back to list\n' +
           '  ? — this help'
       );
@@ -147,6 +153,8 @@ export default function App() {
           />
         </>
       )}
+
+      {tab === 'analytics' && <Analytics />}
 
       <QuotaBar />
 

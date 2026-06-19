@@ -1,4 +1,4 @@
-export type TabKey = 'new' | 'applications' | 'resumes';
+export type TabKey = 'new' | 'applications' | 'resumes' | 'analytics';
 
 interface Props {
   active: TabKey;
@@ -11,6 +11,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'new', label: 'New application' },
   { key: 'applications', label: 'Applications' },
   { key: 'resumes', label: 'Resumes' },
+  { key: 'analytics', label: 'Analytics' },
 ];
 
 export function TabNav({ active, onChange, applicationCount, resumeCount }: Props) {

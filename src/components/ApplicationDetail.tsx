@@ -9,6 +9,7 @@ import {
 import { OutputPanel } from './OutputPanel';
 import { StatusBadge } from './StatusBadge';
 import { InterviewPrep } from './InterviewPrep';
+import { GmailSync } from './GmailSync';
 
 interface Props {
   application: Application;
@@ -156,6 +157,14 @@ export function ApplicationDetail({ application, onBack, onChange }: Props) {
         coverLetter={application.generatedCoverLetter}
         originalResume={originalResume}
         jobDescription={application.jobDescription}
+        onEdit={async (kind, next) => {
+          const patch =
+            kind === 'resume'
+              ? { generatedResume: next }
+              : { generatedCoverLetter: next };
+          const updated = await updateApplication(application.id, patch);
+          if (updated) onChange(updated);
+        }}
       />
 
       <InterviewPrep
@@ -164,6 +173,8 @@ export function ApplicationDetail({ application, onBack, onChange }: Props) {
         highlight={application.status === 'interview'}
         onChange={onChange}
       />
+
+      <GmailSync application={application} onChange={(a) => onChange(a)} />
 
       <details className="card">
         <summary>Original job description</summary>
