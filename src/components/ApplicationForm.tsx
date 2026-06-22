@@ -46,6 +46,7 @@ export function ApplicationForm({
   const [recipientTitle, setRecipientTitle] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [jdUrl, setJdUrl] = useState('');
+  const [jdWarning, setJdWarning] = useState<string | null>(null);
   const [fetchingJd, setFetchingJd] = useState(false);
   const [tone, setTone] = useState('professional');
   const [targetAts, setTargetAts] = useState<number>(85);
@@ -123,9 +124,28 @@ export function ApplicationForm({
     if (!jdUrl.trim()) return;
     setFetchingJd(true);
     setError(null);
+    setJdWarning(null);
     try {
       const result = await fetchJobDescriptionFromUrl(jdUrl.trim());
-      setJobDescription(result.text);
+      const incoming = result.text || '';
+      const warn = result.warning;
+      if (warn) {
+        const existing = jobDescription.trim();
+        const preview =
+          incoming.length > 240 ? incoming.slice(0, 240) + '…' : incoming;
+        const ok = confirm(
+          `${warn}\n\nPreview of what was extracted:\n\n${preview}\n\nUse this text anyway?`
+        );
+        if (!ok) {
+          if (!existing) setJdWarning(warn);
+          else setJdWarning(`${warn} (kept existing JD text)`);
+          return;
+        }
+        setJdWarning(warn);
+      } else {
+        setJdWarning(null);
+      }
+      setJobDescription(incoming);
       // Try to backfill role/company from page title if both empty.
       if (!role && !company && result.title) {
         const t = result.title.trim();
@@ -353,6 +373,22 @@ export function ApplicationForm({
             value={jobDescription}
             onChange={(e) => setJobDescription(e.target.value)}
           />
+          {jdWarning && (
+            <p
+              className="muted"
+              style={{
+                marginTop: '0.5rem',
+                padding: '0.5rem 0.75rem',
+                borderRadius: 6,
+                background: 'rgba(204, 119, 0, 0.1)',
+                border: '1px solid rgba(204, 119, 0, 0.4)',
+                color: 'var(--warn, #b76b00)',
+                fontSize: '0.85rem',
+              }}
+            >
+              ⚠ {jdWarning}
+            </p>
+          )}
         </div>
 
         <div className="ats-target">

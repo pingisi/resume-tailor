@@ -103,6 +103,7 @@ export async function generateDocumentsStream(
 export interface FetchJdResult {
   title: string;
   text: string;
+  warning?: string;
 }
 
 export async function fetchJobDescriptionFromUrl(

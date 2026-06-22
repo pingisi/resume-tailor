@@ -345,7 +345,30 @@ export const fetchJd = onRequest(
         .trim()
         .substring(0, 12000);
 
-      res.json({ title: title.trim(), text });
+      // Heuristic: detect placeholder "this job is filled / expired" pages so
+      // the client can warn the user before pasting them into the JD field.
+      const lower = text.toLowerCase();
+      const expiredPatterns: RegExp[] = [
+        /job (you are|you're) (trying to apply for|looking for) has been (filled|closed|removed)/,
+        /this (job|position|posting|opportunity|role|requisition) (has been|is no longer|is now) (filled|closed|removed|expired|unavailable|available)/,
+        /no longer (accepting|available|active|open)/,
+        /this (job|position|posting) is no longer/,
+        /sorry,? this (job|posting|position)/,
+        /position has been (filled|closed)/,
+        /requisition .{0,20}(closed|filled|expired)/,
+        /we['’]re sorry/,
+      ];
+      let warning: string | undefined;
+      const matched = expiredPatterns.find((re) => re.test(lower));
+      if (matched) {
+        warning =
+          'This page looks like a "job filled / no longer available" notice rather than an active posting.';
+      } else if (text.length < 400) {
+        warning =
+          `Only extracted ${text.length} characters — the page may require JavaScript or login. Check the result before generating.`;
+      }
+
+      res.json({ title: title.trim(), text, warning });
     } catch (err) {
       const e = err as { name?: string; message?: string };
       if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
