@@ -4,18 +4,33 @@ import { ApplicationDetail } from './components/ApplicationDetail';
 import { ApplicationForm } from './components/ApplicationForm';
 import { ApplicationList } from './components/ApplicationList';
 import { BackupPanel } from './components/BackupPanel';
+import { CommandPalette } from './components/CommandPalette';
 import { ProfileManager } from './components/ProfileManager';
 import { QuotaBar } from './components/QuotaBar';
 import { ResumeManager } from './components/ResumeManager';
 import { TabNav, type TabKey } from './components/TabNav';
 import { ThemeToggle } from './components/ThemeToggle';
+import { ToastHost, toast } from './components/Toast';
 import { useShortcuts } from './hooks/useShortcuts';
 import {
   getApplication,
   listApplications,
   listResumes,
+  updateApplication,
 } from './lib/storage';
-import type { Application, ApplicationFormPrefill, StoredResume } from './types';
+import {
+  applyTheme,
+  getEffectiveTheme,
+  getStoredTheme,
+  setStoredTheme,
+  type Theme,
+} from './lib/theme';
+import type {
+  Application,
+  ApplicationFormPrefill,
+  ApplicationStatus,
+  StoredResume,
+} from './types';
 import './App.css';
 
 export default function App() {
@@ -28,6 +43,7 @@ export default function App() {
   const [formPrefill, setFormPrefill] = useState<ApplicationFormPrefill | null>(
     null
   );
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const refreshResumes = useCallback(async () => {
     setResumes(await listResumes());
@@ -119,18 +135,48 @@ export default function App() {
       setTab('profile');
     },
     '?': () => {
-      alert(
-        'Keyboard shortcuts:\n' +
-          '  n — new application\n' +
-          '  a — applications list\n' +
-          '  r — resumes\n' +
-          '  p — profile\n' +
-          '  s — analytics\n' +
-          '  Esc — back to list\n' +
-          '  ? — this help'
-      );
+      toast.show('Keyboard shortcuts', {
+        detail:
+          'n new · a apps · r resumes · p profile · s analytics · Esc back · Ctrl/⌘+K palette',
+        ttl: 6000,
+      });
     },
   });
+
+  // Ctrl/Cmd+K opens the command palette regardless of focus context.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  function cycleTheme() {
+    const order: (Theme | 'system')[] = ['light', 'dark', 'system'];
+    const current = (getStoredTheme() as Theme | null) ?? 'system';
+    const next = order[(order.indexOf(current) + 1) % order.length];
+    if (next === 'system') {
+      localStorage.removeItem('resume-tailor:theme');
+      applyTheme(getEffectiveTheme());
+    } else {
+      setStoredTheme(next);
+    }
+    window.dispatchEvent(new CustomEvent('theme-change'));
+    toast.show(`Theme: ${next}`);
+  }
+
+  async function handleStatusChange(id: string, status: ApplicationStatus) {
+    const updated = await updateApplication(id, { status });
+    if (updated) {
+      await refreshApplications();
+      if (selectedAppId === id) setSelectedApp(updated);
+      toast.success(`Moved to “${status}”`);
+    }
+  }
 
   return (
     <div className="app">
@@ -172,6 +218,7 @@ export default function App() {
         <ApplicationList
           applications={applications}
           onOpen={(id) => setSelectedAppId(id)}
+          onStatusChange={handleStatusChange}
         />
       )}
 
@@ -218,6 +265,45 @@ export default function App() {
         Everything stays in your browser (IndexedDB). The resume + job
         description are sent to the AI only when you click Generate.
       </footer>
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        applications={applications}
+        onNew={() => {
+          setSelectedAppId(null);
+          setTab('new');
+        }}
+        onApplications={() => {
+          setSelectedAppId(null);
+          setTab('applications');
+        }}
+        onResumes={() => {
+          setSelectedAppId(null);
+          setTab('resumes');
+        }}
+        onProfile={() => {
+          setSelectedAppId(null);
+          setTab('profile');
+        }}
+        onAnalytics={() => {
+          setSelectedAppId(null);
+          setTab('analytics');
+        }}
+        onOpenApplication={(id) => {
+          setSelectedAppId(id);
+          setTab('applications');
+        }}
+        onToggleTheme={cycleTheme}
+        onHelp={() => {
+          toast.show('Keyboard shortcuts', {
+            detail:
+              'n new · a apps · r resumes · p profile · s analytics · Esc back · Ctrl/⌘+K palette',
+            ttl: 6000,
+          });
+        }}
+      />
+      <ToastHost />
     </div>
   );
 }

@@ -216,7 +216,17 @@ export function OutputPanel({
         <AtsScore jobDescription={jobDescription} resume={resume} />
       )}
       {effectiveAux === 'diff' && originalResume && (
-        <DiffView original={originalResume} tailored={resume} />
+        <DiffView
+          original={originalResume}
+          tailored={resume}
+          onSave={
+            onEdit
+              ? (merged) => {
+                  void onEdit('resume', merged);
+                }
+              : undefined
+          }
+        />
       )}
       {effectiveAux === 'edit' && onEdit && (
         <SectionEditor

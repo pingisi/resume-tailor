@@ -11,6 +11,7 @@ import { StatusBadge } from './StatusBadge';
 import { InterviewPrep } from './InterviewPrep';
 import { QuickAnswers } from './QuickAnswers';
 import { Messages } from './Messages';
+import { HealthBar } from './HealthBar';
 
 interface Props {
   application: Application;
@@ -92,6 +93,7 @@ export function ApplicationDetail({
 
   return (
     <>
+      <HealthBar application={application} />
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <div>

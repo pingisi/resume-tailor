@@ -1,10 +1,33 @@
 import { useMemo, useState } from 'react';
 import type { Application, ApplicationStatus } from '../types';
 import { StatusBadge } from './StatusBadge';
+import { KanbanBoard } from './KanbanBoard';
 
 interface Props {
   applications: Application[];
   onOpen: (id: string) => void;
+  onStatusChange?: (id: string, status: ApplicationStatus) => void | Promise<void>;
+}
+
+type View = 'table' | 'board';
+const VIEW_KEY = 'resume-tailor:app-list-view';
+
+function loadView(): View {
+  try {
+    const v = localStorage.getItem(VIEW_KEY);
+    return v === 'board' ? 'board' : 'table';
+  } catch {
+    return 'table';
+  }
+}
+
+function matchesQuery(a: Application, tokens: string[]): boolean {
+  if (tokens.length === 0) return true;
+  const hay = [a.name, a.company, a.role, a.notes, a.resumeName, a.status]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return tokens.every((t) => hay.includes(t));
 }
 
 const FILTERS: { key: ApplicationStatus | 'all'; label: string }[] = [
@@ -38,13 +61,34 @@ interface ActionGroup {
   items: ActionItem[];
 }
 
-export function ApplicationList({ applications, onOpen }: Props) {
+export function ApplicationList({ applications, onOpen, onStatusChange }: Props) {
   const [filter, setFilter] = useState<ApplicationStatus | 'all'>('all');
+  const [view, setView] = useState<View>(loadView);
+  const [query, setQuery] = useState('');
+
+  const tokens = useMemo(
+    () => query.trim().toLowerCase().split(/\s+/).filter(Boolean),
+    [query]
+  );
+
+  const searched = useMemo(
+    () => applications.filter((a) => matchesQuery(a, tokens)),
+    [applications, tokens]
+  );
 
   const filtered = useMemo(() => {
-    if (filter === 'all') return applications;
-    return applications.filter((a) => a.status === filter);
-  }, [applications, filter]);
+    if (filter === 'all') return searched;
+    return searched.filter((a) => a.status === filter);
+  }, [searched, filter]);
+
+  function chooseView(v: View) {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* ignore quota errors */
+    }
+  }
 
   const actionGroups = useMemo<ActionGroup[]>(() => {
     const now = Date.now();
@@ -180,7 +224,30 @@ export function ApplicationList({ applications, onOpen }: Props) {
       )}
 
       <div className="card">
-        <h2>Applications</h2>
+        <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0 }}>Applications</h2>
+          {applications.length > 0 && (
+            <div className="view-toggle" role="group" aria-label="View">
+              <button
+                type="button"
+                className={view === 'table' ? 'active' : ''}
+                onClick={() => chooseView('table')}
+                title="Table view"
+              >
+                ☰ Table
+              </button>
+              <button
+                type="button"
+                className={view === 'board' ? 'active' : ''}
+                onClick={() => chooseView('board')}
+                title="Kanban board"
+                disabled={!onStatusChange}
+              >
+                ▦ Board
+              </button>
+            </div>
+          )}
+        </div>
 
         {applications.length === 0 ? (
           <div className="empty-state">
@@ -193,6 +260,23 @@ export function ApplicationList({ applications, onOpen }: Props) {
           </div>
         ) : (
           <>
+            <input
+              type="search"
+              className="search-input"
+              placeholder="Search by name, company, role, notes…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search applications"
+            />
+
+            {view === 'board' && onStatusChange ? (
+              <KanbanBoard
+                applications={searched}
+                onOpen={onOpen}
+                onStatusChange={onStatusChange}
+              />
+            ) : (
+            <>
             <div className="filter-row">
               {FILTERS.map((f) => {
                 const count =
@@ -245,6 +329,13 @@ export function ApplicationList({ applications, onOpen }: Props) {
                 ))}
               </tbody>
             </table>
+            {filtered.length === 0 && tokens.length > 0 && (
+              <p className="muted" style={{ marginTop: '0.75rem' }}>
+                No applications match “{query}”.
+              </p>
+            )}
+            </>
+            )}
           </>
         )}
       </div>

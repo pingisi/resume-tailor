@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { marked } from 'marked';
 import { joinSections, splitSections, type Section } from '../lib/sections';
 
 interface Props {
@@ -7,12 +8,23 @@ interface Props {
   onSave: (next: string) => void | Promise<void>;
 }
 
+const PREVIEW_KEY = 'resume-tailor:section-editor-preview';
+
+function loadPreviewPref(): boolean {
+  try {
+    return localStorage.getItem(PREVIEW_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function SectionEditor({ content, onSave }: Props) {
   const initial = useMemo(() => splitSections(content), [content]);
   const [sections, setSections] = useState<Section[]>(initial);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [showPreview, setShowPreview] = useState<boolean>(loadPreviewPref);
 
   // reset internal state when content prop changes (e.g., regeneration)
   useEffect(() => {
@@ -62,6 +74,23 @@ export function SectionEditor({ content, onSave }: Props) {
     setSavedAt(null);
   }
 
+  function togglePreview() {
+    setShowPreview((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem(PREVIEW_KEY, next ? '1' : '0');
+      } catch {
+        /* ignore quota */
+      }
+      return next;
+    });
+  }
+
+  const livePreviewHtml = useMemo(
+    () => (showPreview ? (marked.parse(joinSections(sections)) as string) : ''),
+    [sections, showPreview]
+  );
+
   if (sections.length === 0) {
     return (
       <div className="empty-state">
@@ -73,8 +102,21 @@ export function SectionEditor({ content, onSave }: Props) {
   }
 
   return (
-    <div className="section-editor">
-      <ul className="section-list">
+    <div className={'section-editor' + (showPreview ? ' with-preview' : '')}>
+      <div className="section-editor-toolbar">
+        <label className="row" style={{ gap: '0.4rem' }}>
+          <input
+            type="checkbox"
+            checked={showPreview}
+            onChange={togglePreview}
+          />
+          <span className="muted" style={{ fontSize: '0.85rem' }}>
+            Live preview
+          </span>
+        </label>
+      </div>
+      <div className="section-editor-grid">
+        <ul className="section-list">
         {sections.map((s, i) => {
           const isOpen = open[s.id] ?? false;
           return (
@@ -134,6 +176,13 @@ export function SectionEditor({ content, onSave }: Props) {
           );
         })}
       </ul>
+        {showPreview && (
+          <div
+            className="preview section-editor-preview"
+            dangerouslySetInnerHTML={{ __html: livePreviewHtml }}
+          />
+        )}
+      </div>
 
       <div className="row" style={{ marginTop: '0.75rem', flexWrap: 'wrap' }}>
         <button className="primary" onClick={save} disabled={!dirty || saving}>
