@@ -473,3 +473,143 @@ export const prepareInterview = onRequest(
     }
   }
 );
+
+// ---------- Answer screening questions ----------
+
+const ANSWER_SYSTEM_PROMPT = `You are an expert job application assistant.
+The user is filling out an application's screening questions and needs
+ready-to-paste answers tailored to a specific role.
+
+You will receive:
+- A PROFILE: facts the user has pre-written about themselves (contact, work
+  auth, salary, elevator pitch, plus any custom Q&A pairs they've saved).
+- ROLE CONTEXT (optional): company, role title, job description, and the
+  tailored resume that was generated for this application.
+- QUESTIONS: a list of screening / application form questions to answer.
+
+For each question, write a single concise answer the user can paste directly
+into the application form.
+
+RULES:
+- Use facts from the PROFILE first. If the user has a custom Q&A whose
+  question is similar to the asked one, use that answer almost verbatim
+  (lightly adapted to the role).
+- If the question maps to a profile field (notice period, salary, work auth,
+  location, years of experience, links, name, email, phone) — answer with
+  that field's value directly, no prose padding. If the field is blank,
+  answer "Prefer to discuss" or the closest neutral placeholder.
+- For open-ended questions (Why this company, Tell us about yourself, etc.),
+  weave the elevator pitch + JD specifics into 2-5 sentences. First person,
+  natural tone, no buzzword salad, no "I am thrilled" openers.
+- Never invent employers, dates, schools, certifications, or numbers the
+  profile/resume do not contain. You MAY invent a brief plausible reason or
+  motivation when the question asks for one.
+- Keep each answer self-contained — do not refer to "see my resume".
+- Match the length to the question: yes/no answers stay 1-2 words, short
+  prompts get 1-2 sentences, motivational essays get 3-5 sentences. Never
+  more than ~120 words.
+
+Return STRICT JSON of this exact shape and nothing else:
+{
+  "answers": [
+    { "question": "<echo the question>", "answer": "<your answer>" }
+  ]
+}`;
+
+interface AnswerBody {
+  profile?: Record<string, unknown> & {
+    customAnswers?: { question?: string; answer?: string }[];
+  };
+  company?: string;
+  role?: string;
+  jobDescription?: string;
+  tailoredResume?: string;
+  questions?: string[];
+}
+
+export const answerQuestions = onRequest(
+  {
+    cors: true,
+    secrets: [GEMINI_API_KEY],
+    timeoutSeconds: 120,
+    memory: '512MiB',
+    region: 'us-central1',
+  },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method not allowed' });
+      return;
+    }
+
+    const body = (req.body || {}) as AnswerBody;
+    const profile = body.profile || {};
+    const questions = Array.isArray(body.questions)
+      ? body.questions
+          .map((q) => (typeof q === 'string' ? q.trim() : ''))
+          .filter((q) => q.length > 0)
+      : [];
+    if (questions.length === 0) {
+      res.status(400).json({ error: 'No questions provided.' });
+      return;
+    }
+    if (questions.length > 30) {
+      res.status(413).json({ error: 'Too many questions (max 30).' });
+      return;
+    }
+
+    const company = (body.company || '').trim();
+    const role = (body.role || '').trim();
+    const jd = (body.jobDescription || '').trim().slice(0, 12000);
+    const resume = (body.tailoredResume || '').trim().slice(0, 20000);
+
+    try {
+      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY.value());
+      const model = genAI.getGenerativeModel({
+        model: MODEL,
+        systemInstruction: ANSWER_SYSTEM_PROMPT,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.6,
+        },
+      });
+
+      const lines: (string | null)[] = [
+        '=== PROFILE ===',
+        JSON.stringify(profile, null, 2),
+        '',
+        company ? `Company: ${company}` : null,
+        role ? `Target role: ${role}` : null,
+        resume ? '\n=== TAILORED RESUME ===\n' + resume : null,
+        jd ? '\n=== JOB DESCRIPTION ===\n' + jd : null,
+        '',
+        '=== QUESTIONS ===',
+        ...questions.map((q, i) => `${i + 1}. ${q}`),
+      ];
+      const prompt = lines.filter((l) => l !== null).join('\n');
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+
+      let parsed: { answers?: unknown };
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        res
+          .status(502)
+          .json({ error: 'Model returned non-JSON.', raw: text.substring(0, 200) });
+        return;
+      }
+
+      const answers = Array.isArray(parsed.answers) ? parsed.answers : [];
+      if (answers.length === 0) {
+        res.status(502).json({ error: 'Model returned no answers.' });
+        return;
+      }
+      res.json({ answers });
+    } catch (err) {
+      const e = err as { message?: string };
+      console.error('answerQuestions error', err);
+      res.status(500).json({ error: e?.message || 'Internal error' });
+    }
+  }
+);

@@ -9,6 +9,7 @@ import {
 import { OutputPanel } from './OutputPanel';
 import { StatusBadge } from './StatusBadge';
 import { InterviewPrep } from './InterviewPrep';
+import { QuickAnswers } from './QuickAnswers';
 
 interface Props {
   application: Application;
@@ -174,6 +175,8 @@ export function ApplicationDetail({ application, onBack, onChange }: Props) {
         highlight={application.status === 'interview'}
         onChange={onChange}
       />
+
+      <QuickAnswers application={application} onChange={onChange} />
 
       <details className="card">
         <summary>Original job description</summary>

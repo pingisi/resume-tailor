@@ -8,12 +8,13 @@ const STORAGE_KEY = 'resume-tailor:quota';
 const SOFT_LIMIT = 250;
 const WARN_THRESHOLD = 0.8;
 
-export type QuotaKind = 'generate' | 'interview';
+export type QuotaKind = 'generate' | 'interview' | 'answers';
 
 interface QuotaState {
   date: string; // YYYY-MM-DD UTC
   generate: number;
   interview: number;
+  answers: number;
 }
 
 function today(): string {
@@ -23,14 +24,19 @@ function today(): string {
 function load(): QuotaState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { date: today(), generate: 0, interview: 0 };
-    const parsed = JSON.parse(raw) as QuotaState;
+    if (!raw) return { date: today(), generate: 0, interview: 0, answers: 0 };
+    const parsed = JSON.parse(raw) as Partial<QuotaState> & { date?: string };
     if (parsed.date !== today()) {
-      return { date: today(), generate: 0, interview: 0 };
+      return { date: today(), generate: 0, interview: 0, answers: 0 };
     }
-    return parsed;
+    return {
+      date: parsed.date,
+      generate: parsed.generate ?? 0,
+      interview: parsed.interview ?? 0,
+      answers: parsed.answers ?? 0,
+    };
   } catch {
-    return { date: today(), generate: 0, interview: 0 };
+    return { date: today(), generate: 0, interview: 0, answers: 0 };
   }
 }
 
@@ -53,6 +59,7 @@ export interface QuotaSnapshot {
   date: string;
   generate: number;
   interview: number;
+  answers: number;
   total: number;
   limit: number;
   pct: number;
@@ -62,11 +69,12 @@ export interface QuotaSnapshot {
 
 export function snapshot(): QuotaSnapshot {
   const s = load();
-  const total = s.generate + s.interview;
+  const total = s.generate + s.interview + s.answers;
   return {
     date: s.date,
     generate: s.generate,
     interview: s.interview,
+    answers: s.answers,
     total,
     limit: SOFT_LIMIT,
     pct: Math.min(1, total / SOFT_LIMIT),

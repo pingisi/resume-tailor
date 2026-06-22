@@ -54,6 +54,7 @@ export interface Application {
   status: ApplicationStatus;
   notes?: string;
   interviewPrep?: InterviewPrep;
+  quickAnswers?: { question: string; answer: string }[];
   createdAt: number;
   updatedAt: number;
   appliedAt?: number;
@@ -74,4 +75,42 @@ export interface GenerateRequest {
 export interface GenerateResponse {
   resume: string;
   coverLetter: string;
+}
+
+export interface ProfileQA {
+  question: string;
+  answer: string;
+}
+
+export interface Profile {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  linkedin?: string;
+  github?: string;
+  portfolio?: string;
+  location?: string;
+  workAuthorization?: string;
+  willingToRelocate?: string;
+  noticePeriod?: string;
+  yearsOfExperience?: string;
+  salaryExpectation?: string;
+  preferredArrangement?: string;
+  about?: string;
+  reasonForLeaving?: string;
+  customAnswers?: ProfileQA[];
+  updatedAt: number;
+}
+
+export interface AnswerRequest {
+  profile: Profile;
+  company?: string;
+  role?: string;
+  jobDescription?: string;
+  tailoredResume?: string;
+  questions: string[];
+}
+
+export interface AnswerResponse {
+  answers: { question: string; answer: string }[];
 }

@@ -1,15 +1,19 @@
 import { saveAs } from 'file-saver';
-import type { Application, StoredResume } from '../types';
+import type { Application, Profile, StoredResume } from '../types';
 import {
   bulkPutApplications,
   bulkPutResumes,
   clearApplications,
+  clearProfile,
   clearResumes,
+  getProfile,
   listApplications,
   listResumes,
+  saveProfile,
 } from './storage';
 
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
+const SUPPORTED_VERSIONS = [1, 2];
 
 export interface BackupFile {
   version: number;
@@ -17,14 +21,16 @@ export interface BackupFile {
   appVersion: string;
   resumes: StoredResume[];
   applications: Application[];
+  profile?: Profile | null;
 }
 
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.2.0';
 
 export async function exportBackup(): Promise<void> {
-  const [resumes, applications] = await Promise.all([
+  const [resumes, applications, profile] = await Promise.all([
     listResumes(),
     listApplications(),
+    getProfile(),
   ]);
   const payload: BackupFile = {
     version: BACKUP_VERSION,
@@ -32,6 +38,7 @@ export async function exportBackup(): Promise<void> {
     appVersion: APP_VERSION,
     resumes,
     applications,
+    profile: profile ?? null,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: 'application/json;charset=utf-8',
@@ -43,6 +50,7 @@ export async function exportBackup(): Promise<void> {
 export interface ImportStats {
   resumes: number;
   applications: number;
+  profile: boolean;
   mode: 'merge' | 'replace';
 }
 
@@ -57,9 +65,9 @@ export async function importBackup(
   } catch {
     throw new Error('That file is not valid JSON.');
   }
-  if (parsed?.version !== BACKUP_VERSION) {
+  if (!SUPPORTED_VERSIONS.includes(parsed?.version)) {
     throw new Error(
-      `Unsupported backup version ${parsed?.version ?? '?'} (expected ${BACKUP_VERSION}).`
+      `Unsupported backup version ${parsed?.version ?? '?'} (expected ${SUPPORTED_VERSIONS.join(' or ')}).`
     );
   }
   if (!Array.isArray(parsed.resumes) || !Array.isArray(parsed.applications)) {
@@ -69,13 +77,20 @@ export async function importBackup(
   if (mode === 'replace') {
     await clearResumes();
     await clearApplications();
+    await clearProfile();
   }
   await bulkPutResumes(parsed.resumes);
   await bulkPutApplications(parsed.applications);
 
+  const hasProfile = !!parsed.profile && typeof parsed.profile === 'object';
+  if (hasProfile) {
+    await saveProfile(parsed.profile as Profile);
+  }
+
   return {
     resumes: parsed.resumes.length,
     applications: parsed.applications.length,
+    profile: hasProfile,
     mode,
   };
 }

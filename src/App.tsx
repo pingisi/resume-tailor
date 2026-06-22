@@ -4,6 +4,7 @@ import { ApplicationDetail } from './components/ApplicationDetail';
 import { ApplicationForm } from './components/ApplicationForm';
 import { ApplicationList } from './components/ApplicationList';
 import { BackupPanel } from './components/BackupPanel';
+import { ProfileManager } from './components/ProfileManager';
 import { QuotaBar } from './components/QuotaBar';
 import { ResumeManager } from './components/ResumeManager';
 import { TabNav, type TabKey } from './components/TabNav';
@@ -77,12 +78,17 @@ export default function App() {
       setSelectedAppId(null);
       setTab('analytics');
     },
+    p: () => {
+      setSelectedAppId(null);
+      setTab('profile');
+    },
     '?': () => {
       alert(
         'Keyboard shortcuts:\n' +
           '  n — new application\n' +
           '  a — applications list\n' +
           '  r — resumes\n' +
+          '  p — profile\n' +
           '  s — analytics\n' +
           '  Esc — back to list\n' +
           '  ? — this help'
@@ -155,6 +161,8 @@ export default function App() {
       )}
 
       {tab === 'analytics' && <Analytics />}
+
+      {tab === 'profile' && <ProfileManager />}
 
       <QuotaBar />
 

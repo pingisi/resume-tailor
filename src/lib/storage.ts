@@ -1,10 +1,17 @@
 import { openDB, type IDBPDatabase } from 'idb';
-import type { Application, ApplicationStatus, StoredResume } from '../types';
+import type {
+  Application,
+  ApplicationStatus,
+  Profile,
+  StoredResume,
+} from '../types';
 
 const DB_NAME = 'resume-tailor';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const RESUMES = 'resumes';
 const APPLICATIONS = 'applications';
+const PROFILE = 'profile';
+const PROFILE_KEY = 'me';
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
@@ -46,6 +53,11 @@ function getDB() {
             const apps = db.createObjectStore(APPLICATIONS, { keyPath: 'id' });
             apps.createIndex('createdAt', 'createdAt');
             apps.createIndex('status', 'status');
+          }
+        }
+        if (oldVersion < 3) {
+          if (!db.objectStoreNames.contains(PROFILE)) {
+            db.createObjectStore(PROFILE);
           }
         }
       },
@@ -231,4 +243,21 @@ export async function bulkPutApplications(items: Application[]): Promise<void> {
   const store = tx.objectStore(APPLICATIONS);
   for (const a of items) await store.put(a);
   await tx.done;
+}
+
+// ---------- Profile ----------
+
+export async function getProfile(): Promise<Profile | undefined> {
+  const db = await getDB();
+  return (await db.get(PROFILE, PROFILE_KEY)) as Profile | undefined;
+}
+
+export async function saveProfile(p: Profile): Promise<void> {
+  const db = await getDB();
+  await db.put(PROFILE, { ...p, updatedAt: Date.now() }, PROFILE_KEY);
+}
+
+export async function clearProfile(): Promise<void> {
+  const db = await getDB();
+  await db.delete(PROFILE, PROFILE_KEY);
 }

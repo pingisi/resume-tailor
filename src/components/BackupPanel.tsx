@@ -43,7 +43,7 @@ export function BackupPanel({ onImported }: Props) {
     try {
       const result: ImportStats = await importBackup(f, mode);
       setStatus(
-        `Imported ${result.resumes} resume(s) and ${result.applications} application(s) (${result.mode}).`
+        `Imported ${result.resumes} resume(s), ${result.applications} application(s)${result.profile ? ', and profile' : ''} (${result.mode}).`
       );
       if (fileRef.current) fileRef.current.value = '';
       await onImported();
