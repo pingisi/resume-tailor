@@ -15,7 +15,7 @@ import {
   listApplications,
   listResumes,
 } from './lib/storage';
-import type { Application, StoredResume } from './types';
+import type { Application, ApplicationFormPrefill, StoredResume } from './types';
 import './App.css';
 
 export default function App() {
@@ -25,6 +25,9 @@ export default function App() {
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [formPrefill, setFormPrefill] = useState<ApplicationFormPrefill | null>(
+    null
+  );
 
   const refreshResumes = useCallback(async () => {
     setResumes(await listResumes());
@@ -122,6 +125,8 @@ export default function App() {
         <ApplicationForm
           resumes={resumes}
           defaultResumeId={defaultResume?.id}
+          prefill={formPrefill}
+          onPrefillConsumed={() => setFormPrefill(null)}
           onSaved={async (app) => {
             await refreshApplications();
             setSelectedAppId(app.id);
@@ -145,6 +150,16 @@ export default function App() {
             await refreshApplications();
             if (updated === null) setSelectedAppId(null);
             else setSelectedApp(updated);
+          }}
+          onClone={(app) => {
+            setFormPrefill({
+              resumeId: app.resumeId,
+              tone: app.tone,
+              recipientName: app.recipient?.name,
+              recipientTitle: app.recipient?.title,
+            });
+            setSelectedAppId(null);
+            setTab('new');
           }}
         />
       )}

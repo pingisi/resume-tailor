@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Application, StoredResume } from '../types';
+import type {
+  Application,
+  ApplicationFormPrefill,
+  StoredResume,
+} from '../types';
 import {
   generateDocumentsStream,
   fetchJobDescriptionFromUrl,
@@ -21,10 +25,18 @@ function atsTargetHint(t: number): string {
 interface Props {
   resumes: StoredResume[];
   defaultResumeId?: string;
+  prefill?: ApplicationFormPrefill | null;
   onSaved: (app: Application) => void;
+  onPrefillConsumed?: () => void;
 }
 
-export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
+export function ApplicationForm({
+  resumes,
+  defaultResumeId,
+  prefill,
+  onSaved,
+  onPrefillConsumed,
+}: Props) {
   const [resumeId, setResumeId] = useState<string>(defaultResumeId || '');
   const [company, setCompany] = useState('');
   const [role, setRole] = useState('');
@@ -48,6 +60,27 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
   useEffect(() => {
     if (!resumeId && defaultResumeId) setResumeId(defaultResumeId);
   }, [defaultResumeId, resumeId]);
+
+  useEffect(() => {
+    if (!prefill) return;
+    if (prefill.resumeId) setResumeId(prefill.resumeId);
+    if (prefill.company !== undefined) setCompany(prefill.company);
+    if (prefill.role !== undefined) setRole(prefill.role);
+    if (prefill.recipientName !== undefined)
+      setRecipientName(prefill.recipientName);
+    if (prefill.recipientTitle !== undefined)
+      setRecipientTitle(prefill.recipientTitle);
+    if (prefill.tone) setTone(prefill.tone);
+    if (typeof prefill.targetAts === 'number') setTargetAts(prefill.targetAts);
+    setName('');
+    setNameTouched(false);
+    setJobDescription('');
+    setJdUrl('');
+    setResumeOut('');
+    setCoverOut('');
+    setError(null);
+    onPrefillConsumed?.();
+  }, [prefill, onPrefillConsumed]);
 
   useEffect(() => {
     if (nameTouched) return;

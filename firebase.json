@@ -9,6 +9,7 @@
         { "source": "/api/fetch-jd", "function": "fetchJd" },
         { "source": "/api/prepare-interview", "function": "prepareInterview" },
         { "source": "/api/answer-questions", "function": "answerQuestions" },
+        { "source": "/api/compose-message", "function": "composeMessage" },
         { "source": "**", "destination": "/index.html" }
       ]
     }

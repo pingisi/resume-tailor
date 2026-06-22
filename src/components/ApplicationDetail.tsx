@@ -10,14 +10,21 @@ import { OutputPanel } from './OutputPanel';
 import { StatusBadge } from './StatusBadge';
 import { InterviewPrep } from './InterviewPrep';
 import { QuickAnswers } from './QuickAnswers';
+import { Messages } from './Messages';
 
 interface Props {
   application: Application;
   onBack: () => void;
   onChange: (app: Application | null) => void;
+  onClone?: (app: Application) => void;
 }
 
-export function ApplicationDetail({ application, onBack, onChange }: Props) {
+export function ApplicationDetail({
+  application,
+  onBack,
+  onChange,
+  onClone,
+}: Props) {
   const [notes, setNotes] = useState(application.notes ?? '');
   const [originalResume, setOriginalResume] = useState<string | undefined>();
   const notesTimer = useRef<number | null>(null);
@@ -69,9 +76,16 @@ export function ApplicationDetail({ application, onBack, onChange }: Props) {
           <div>
             <button onClick={onBack}>← Back</button>
           </div>
-          <button className="danger" onClick={handleDelete}>
-            Delete
-          </button>
+          <div className="row">
+            {onClone && (
+              <button onClick={() => onClone(application)} title="Start a new application with the same resume, tone, and recipient">
+                Clone
+              </button>
+            )}
+            <button className="danger" onClick={handleDelete}>
+              Delete
+            </button>
+          </div>
         </div>
 
         <h2 style={{ marginTop: '1rem' }}>
@@ -177,6 +191,8 @@ export function ApplicationDetail({ application, onBack, onChange }: Props) {
       />
 
       <QuickAnswers application={application} onChange={onChange} />
+
+      <Messages application={application} onChange={onChange} />
 
       <details className="card">
         <summary>Original job description</summary>

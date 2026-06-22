@@ -55,6 +55,7 @@ export interface Application {
   notes?: string;
   interviewPrep?: InterviewPrep;
   quickAnswers?: { question: string; answer: string }[];
+  messages?: AppMessage[];
   createdAt: number;
   updatedAt: number;
   appliedAt?: number;
@@ -113,4 +114,42 @@ export interface AnswerRequest {
 
 export interface AnswerResponse {
   answers: { question: string; answer: string }[];
+}
+
+export type MessageKind = 'follow-up' | 'thank-you' | 'recruiter-dm';
+
+export interface AppMessage {
+  kind: MessageKind;
+  subject?: string;
+  body: string;
+  generatedAt: number;
+}
+
+export interface ComposeMessageRequest {
+  kind: MessageKind;
+  profile?: Profile;
+  company?: string;
+  role?: string;
+  jobDescription?: string;
+  tailoredResume?: string;
+  recipient?: ApplicationRecipient;
+  appliedAt?: number;
+  daysSinceApplied?: number;
+  /** Optional free-text guidance, e.g. “mention the AI/ML angle”. */
+  extra?: string;
+}
+
+export interface ComposeMessageResponse {
+  subject?: string;
+  body: string;
+}
+
+export interface ApplicationFormPrefill {
+  resumeId?: string;
+  company?: string;
+  role?: string;
+  recipientName?: string;
+  recipientTitle?: string;
+  tone?: string;
+  targetAts?: number;
 }

@@ -613,3 +613,151 @@ export const answerQuestions = onRequest(
     }
   }
 );
+
+// ---------- Compose follow-up / thank-you / recruiter DM ----------
+
+type MessageKind = 'follow-up' | 'thank-you' | 'recruiter-dm';
+
+const MESSAGE_SYSTEM_PROMPT = `You are an expert job-search writing assistant.
+You will be given a message KIND, context about an application, and the
+candidate's profile. Produce ONE short, paste-ready message.
+
+KIND rules:
+
+- "follow-up"   — Polite, confident email to the recruiter/hiring manager
+                  after the candidate has applied. 3-4 sentences. Reaffirm
+                  interest, note ONE specific qualification that maps to the
+                  role, ask about timing. Include a short subject line like
+                  "Following up — <role> application". Sign as the candidate.
+                  If \`daysSinceApplied\` is small (<5) keep it lighter; if it
+                  is larger, acknowledge the wait briefly.
+
+- "thank-you"   — Warm, professional email sent after an interview. 3-5
+                  sentences. Thank them for the time, reference one topic that
+                  came up (you can be slightly generic if no topic is given),
+                  reiterate interest, signal next steps. Subject like
+                  "Thank you — <role> interview". Sign as the candidate.
+
+- "recruiter-dm" — LinkedIn-style DM, NO subject line. 2-3 sentences max,
+                  conversational. Lead with the role applied for, ONE concrete
+                  reason you're a fit, ask if there is a fit. No greeting like
+                  "Dear", just "Hi <name>" if name available, else "Hi there".
+
+GLOBAL RULES:
+- Use first person. Natural, human tone. NO buzzword salad ("synergize",
+  "leverage", "passionate ninja").
+- NEVER invent employers, schools, certs, dates, numbers. You MAY allude to
+  responsibilities the resume actually shows.
+- If recipient name is given, address them by first name only.
+- Sign with the candidate's first name (or full name if first not obvious).
+- Keep \`body\` plain text with single blank-line paragraph breaks. No
+  markdown, no bullet lists.
+
+Return STRICT JSON of this exact shape and nothing else:
+{
+  "subject": "<subject line, or empty string for recruiter-dm>",
+  "body": "<the message body>"
+}`;
+
+interface ComposeBody {
+  kind?: MessageKind;
+  profile?: Record<string, unknown>;
+  company?: string;
+  role?: string;
+  jobDescription?: string;
+  tailoredResume?: string;
+  recipient?: { name?: string; title?: string };
+  appliedAt?: number;
+  daysSinceApplied?: number;
+  extra?: string;
+}
+
+export const composeMessage = onRequest(
+  {
+    cors: true,
+    secrets: [GEMINI_API_KEY],
+    timeoutSeconds: 90,
+    memory: '512MiB',
+    region: 'us-central1',
+  },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method not allowed' });
+      return;
+    }
+
+    const body = (req.body || {}) as ComposeBody;
+    const kind = body.kind;
+    if (kind !== 'follow-up' && kind !== 'thank-you' && kind !== 'recruiter-dm') {
+      res.status(400).json({ error: 'Invalid or missing kind.' });
+      return;
+    }
+
+    const company = (body.company || '').trim();
+    const role = (body.role || '').trim();
+    const jd = (body.jobDescription || '').trim().slice(0, 8000);
+    const resume = (body.tailoredResume || '').trim().slice(0, 12000);
+    const extra = (body.extra || '').trim().slice(0, 1000);
+    const recipient = body.recipient || {};
+    const profile = body.profile || {};
+    const days =
+      typeof body.daysSinceApplied === 'number'
+        ? Math.max(0, Math.round(body.daysSinceApplied))
+        : null;
+
+    try {
+      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY.value());
+      const model = genAI.getGenerativeModel({
+        model: MODEL,
+        systemInstruction: MESSAGE_SYSTEM_PROMPT,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.6,
+        },
+      });
+
+      const lines: (string | null)[] = [
+        `KIND: ${kind}`,
+        company ? `Company: ${company}` : null,
+        role ? `Role: ${role}` : null,
+        recipient.name ? `Recipient name: ${recipient.name}` : null,
+        recipient.title ? `Recipient title: ${recipient.title}` : null,
+        days !== null ? `Days since applied: ${days}` : null,
+        extra ? `\nExtra guidance from candidate: ${extra}` : null,
+        '\n=== CANDIDATE PROFILE ===',
+        JSON.stringify(profile, null, 2),
+        resume ? '\n=== TAILORED RESUME ===\n' + resume : null,
+        jd ? '\n=== JOB DESCRIPTION ===\n' + jd : null,
+      ];
+      const prompt = lines.filter((l) => l !== null).join('\n');
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+
+      let parsed: { subject?: unknown; body?: unknown };
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        res.status(502).json({
+          error: 'Model returned non-JSON.',
+          raw: text.substring(0, 200),
+        });
+        return;
+      }
+
+      const out = {
+        subject: typeof parsed.subject === 'string' ? parsed.subject : '',
+        body: typeof parsed.body === 'string' ? parsed.body : '',
+      };
+      if (!out.body) {
+        res.status(502).json({ error: 'Model returned no body.' });
+        return;
+      }
+      res.json(out);
+    } catch (err) {
+      const e = err as { message?: string };
+      console.error('composeMessage error', err);
+      res.status(500).json({ error: e?.message || 'Internal error' });
+    }
+  }
+);
