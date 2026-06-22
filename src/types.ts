@@ -49,6 +49,7 @@ export interface Application {
   jobDescription: string;
   recipient?: ApplicationRecipient;
   tone: string;
+  applyUrl?: string;
   generatedResume: string;
   generatedCoverLetter: string;
   status: ApplicationStatus;

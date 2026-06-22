@@ -214,6 +214,7 @@ export function ApplicationForm({
               }
             : undefined,
         tone,
+        applyUrl: jdUrl.trim() || undefined,
         generatedResume: resumeOut,
         generatedCoverLetter: coverOut,
         status,

@@ -26,12 +26,18 @@ export function ApplicationDetail({
   onClone,
 }: Props) {
   const [notes, setNotes] = useState(application.notes ?? '');
+  const [applyUrl, setApplyUrl] = useState(application.applyUrl ?? '');
   const [originalResume, setOriginalResume] = useState<string | undefined>();
   const notesTimer = useRef<number | null>(null);
+  const applyUrlTimer = useRef<number | null>(null);
 
   useEffect(() => {
     setNotes(application.notes ?? '');
   }, [application.id, application.notes]);
+
+  useEffect(() => {
+    setApplyUrl(application.applyUrl ?? '');
+  }, [application.id, application.applyUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +62,21 @@ export function ApplicationDetail({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes]);
+
+  useEffect(() => {
+    if (applyUrl === (application.applyUrl ?? '')) return;
+    if (applyUrlTimer.current) window.clearTimeout(applyUrlTimer.current);
+    applyUrlTimer.current = window.setTimeout(async () => {
+      const updated = await updateApplication(application.id, {
+        applyUrl: applyUrl.trim() || undefined,
+      });
+      if (updated) onChange(updated);
+    }, 500);
+    return () => {
+      if (applyUrlTimer.current) window.clearTimeout(applyUrlTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applyUrl]);
 
   async function handleStatusChange(status: ApplicationStatus) {
     const updated = await updateApplication(application.id, { status });
@@ -149,6 +170,36 @@ export function ApplicationDetail({
             </select>
           </label>
         </div>
+
+        <label style={{ display: 'block', marginTop: '1rem' }}>
+          <span style={{ display: 'block', marginBottom: '0.25rem' }}>
+            Apply URL
+          </span>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <input
+              type="url"
+              placeholder="https://… link to the job posting / application page"
+              value={applyUrl}
+              onChange={(e) => setApplyUrl(e.target.value)}
+              style={{ flex: 1, minWidth: 240 }}
+            />
+            <button
+              type="button"
+              disabled={!applyUrl.trim()}
+              onClick={() => {
+                const u = applyUrl.trim();
+                if (!u) return;
+                const safe = /^https?:\/\//i.test(u) ? u : `https://${u}`;
+                window.open(safe, '_blank', 'noopener,noreferrer');
+              }}
+            >
+              Open
+            </button>
+          </div>
+          <span className="muted" style={{ fontSize: '0.8rem' }}>
+            Auto-saves
+          </span>
+        </label>
 
         <label style={{ display: 'block', marginTop: '1rem' }}>
           <span style={{ display: 'block', marginBottom: '0.25rem' }}>
