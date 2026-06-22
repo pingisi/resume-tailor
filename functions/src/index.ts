@@ -11,40 +11,25 @@ const COVER_DELIM = '<<<COVER_LETTER>>>';
 
 const SYSTEM_PROMPT = `You are an expert resume writer and career coach.
 You will receive a candidate's existing resume and a job description, plus
-optional company, role title, hiring-manager information, and a list of
-target keywords extracted from the job description.
+optional company, role title, hiring-manager information, a list of target
+keywords extracted from the job description, and a FABRICATION POLICY that
+tells you how aggressively to embellish.
 
-Your task:
-1. Produce a tailored version of the resume that emphasizes the experience,
-   skills, and accomplishments most relevant to the job description. Keep
-   ALL facts truthful — do NOT invent employers, titles, dates, degrees, or
-   metrics. You may rephrase, reorder, and re-emphasize.
-2. Be COMPREHENSIVE. Keep EVERY job, role, and project from the original
-   resume — do NOT drop earlier positions to save space. For each role
-   (current and previous), produce 4-7 detailed bullet points that surface
-   real impact, scope, technologies used, collaboration, and measurable
-   outcomes. Prefer specific, quantified bullets over vague ones. Where the
-   original resume is sparse on a role, expand by paraphrasing implicit
-   responsibilities common to that title — but never invent specific
-   metrics, customers, or named systems that are not implied by the source.
-3. TARGET KEYWORDS: when the user provides a TARGET KEYWORDS list, treat
-   each keyword as a high-value ATS term. For every keyword that genuinely
-   applies to the candidate's background (based on the existing resume),
-   ensure the EXACT keyword text appears verbatim somewhere in the tailored
-   resume — in a bullet, the summary, or a Skills section. Do NOT include a
-   keyword that has no truthful connection to the candidate's experience. A
-   Skills / Technologies / Tools section is encouraged to collect the
-   relevant keywords compactly.
-4. Structure: start with a 2-3 sentence professional summary tailored to
-   the role, then a "## Skills" section listing relevant technologies/tools
-   (one line, comma-separated or bulleted), then "## Experience" with one
-   subsection per role using "### Role — Company (dates)", then
-   "## Education" and any other original sections.
-5. Produce a matching cover letter (~250-350 words). If a hiring manager
-   name is provided, address it to them ("Dear <Name>,"); otherwise use
-   "Dear Hiring Team,". Reference the company by name when known. Reference
-   specific requirements from the job description and how the candidate's
-   background meets them.
+Ground rules (apply at every fabrication level):
+- NEVER change employers, job titles, employment dates, schools, or degrees.
+- ALWAYS keep every job and project from the original resume — do not drop
+  older roles. Each role gets 4-7 detailed bullet points covering scope,
+  technologies, collaboration, and outcomes.
+- Structure the resume as: short professional summary, then "## Skills"
+  (compact, comma-separated or bulleted), then "## Experience" with one
+  subsection per role "### Role — Company (dates)", then "## Education" and
+  any other original sections.
+- Use the candidate's pronouns/voice consistently.
+- The cover letter (~250-350 words) addresses the hiring manager by name if
+  given, else "Dear Hiring Team,". Reference the company by name when known
+  and tie specific JD requirements to claims made in the resume.
+
+The user prompt will contain a FABRICATION POLICY block. Follow it literally.
 
 Output format — RAW MARKDOWN ONLY, NO JSON, NO CODE FENCES:
 
@@ -71,6 +56,59 @@ interface Body {
   role?: string;
   recipient?: Recipient;
   keywords?: string[];
+  /** 0-100. Higher = more aggressive fabrication. */
+  targetAts?: number;
+}
+
+function fabricationPolicy(target: number, kwCount: number): string {
+  const t = Math.max(0, Math.min(100, Math.round(target)));
+  if (t >= 95) {
+    return [
+      `FABRICATION POLICY: AGGRESSIVE (target ATS ${t}/100).`,
+      `- Every single keyword in the TARGET KEYWORDS list MUST appear verbatim`,
+      `  in the resume (in bullets, the Summary, or the Skills section). All`,
+      `  ${kwCount} keywords are required.`,
+      `- If the candidate has no truthful basis for a keyword, INVENT a`,
+      `  plausible side project, internal initiative, proof of concept, or`,
+      `  responsibility within an EXISTING role that uses that technology.`,
+      `  Keep the invented detail consistent with the candidate's seniority`,
+      `  and domain.`,
+      `- You MAY claim hands-on proficiency with any tool, framework, or`,
+      `  methodology mentioned in the JD.`,
+      `- You MUST NOT change employers, titles, dates, schools, or degrees.`,
+      `- The cover letter must echo the strongest 5-8 keywords verbatim and`,
+      `  reference at least two specific JD requirements.`,
+    ].join('\n');
+  }
+  if (t >= 80) {
+    return [
+      `FABRICATION POLICY: STRONG (target ATS ${t}/100).`,
+      `- Treat every keyword the candidate could plausibly know (based on`,
+      `  their general domain and seniority) as truly familiar; surface it`,
+      `  verbatim in a bullet or the Skills section.`,
+      `- You MAY add 1-2 plausible side projects or internal initiatives to`,
+      `  cover the most important missing keywords — keep them realistic.`,
+      `- Do NOT invent named customers, specific revenue numbers, or awards.`,
+      `- Do NOT change employers, titles, dates, schools, or degrees.`,
+    ].join('\n');
+  }
+  if (t >= 60) {
+    return [
+      `FABRICATION POLICY: LIGHT STRETCH (target ATS ${t}/100).`,
+      `- Where the candidate's background plausibly touches a keyword,`,
+      `  surface that keyword verbatim. Prefer paraphrasing existing bullets`,
+      `  to add the keyword over inventing new ones.`,
+      `- Do NOT add new projects, customers, metrics, or technologies the`,
+      `  candidate has no evidence of having used.`,
+    ].join('\n');
+  }
+  return [
+    `FABRICATION POLICY: STRICT (target ATS ${t}/100).`,
+    `- Keep ALL facts truthful. Do NOT invent employers, titles, dates,`,
+    `  metrics, technologies, customers, or accomplishments.`,
+    `- Only include a keyword verbatim if the candidate's existing resume`,
+    `  already supports that claim.`,
+  ].join('\n');
 }
 
 function buildPrompt(b: Body): string {
@@ -78,6 +116,10 @@ function buildPrompt(b: Body): string {
     .map((k) => k.trim())
     .filter((k) => k.length > 0)
     .slice(0, 40);
+  const policy = fabricationPolicy(
+    typeof b.targetAts === 'number' ? b.targetAts : 50,
+    kws.length
+  );
   const parts: (string | null)[] = [
     `Tone: ${(b.tone || 'professional').trim()}`,
     b.company ? `Company: ${b.company.trim()}` : null,
@@ -87,8 +129,10 @@ function buildPrompt(b: Body): string {
           b.recipient.title ? ` (${b.recipient.title.trim()})` : ''
         }`
       : null,
+    '',
+    policy,
     kws.length
-      ? `\n=== TARGET KEYWORDS (include verbatim where truthful) ===\n${kws.join(', ')}`
+      ? `\n=== TARGET KEYWORDS ===\n${kws.join(', ')}`
       : null,
     '',
     '=== EXISTING RESUME ===',

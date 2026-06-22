@@ -4,9 +4,19 @@ import {
   generateDocumentsStream,
   fetchJobDescriptionFromUrl,
 } from '../api/generate';
-import { extractKeywords } from '../lib/keywords';
+import { extractKeywords, ats } from '../lib/keywords';
 import { makeApplicationId, saveApplication } from '../lib/storage';
 import { OutputPanel } from './OutputPanel';
+
+function atsTargetHint(t: number): string {
+  if (t >= 95)
+    return 'Maximum match — model will INVENT plausible projects/skills to hit every keyword. Employers, titles, dates, degrees stay untouched.';
+  if (t >= 80)
+    return 'Strong match — model will claim familiarity with anything plausible and may add small invented initiatives.';
+  if (t >= 60)
+    return 'Light stretch — surfaces keywords your background plausibly supports. No invented projects or metrics.';
+  return 'Strict — only includes keywords already truthfully present in your base resume.';
+}
 
 interface Props {
   resumes: StoredResume[];
@@ -26,6 +36,7 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
   const [jdUrl, setJdUrl] = useState('');
   const [fetchingJd, setFetchingJd] = useState(false);
   const [tone, setTone] = useState('professional');
+  const [targetAts, setTargetAts] = useState<number>(85);
   const [busy, setBusy] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -50,6 +61,11 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
     () => resumes.find((r) => r.id === resumeId),
     [resumes, resumeId]
   );
+
+  const currentAts = useMemo(() => {
+    if (!selectedResume || jobDescription.trim().length < 30) return null;
+    return ats(jobDescription, selectedResume.text).score;
+  }, [selectedResume, jobDescription]);
 
   const canGenerate =
     !!selectedResume &&
@@ -120,6 +136,7 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
                 }
               : undefined,
           keywords: extractKeywords(jobDescription, 30),
+          targetAts,
         },
         (p) => {
           setResumeOut(p.resume);
@@ -302,6 +319,30 @@ export function ApplicationForm({ resumes, defaultResumeId, onSaved }: Props) {
             value={jobDescription}
             onChange={(e) => setJobDescription(e.target.value)}
           />
+        </div>
+
+        <div className="ats-target">
+          <div className="ats-target-head">
+            <strong>ATS keyword targeting</strong>
+            <span className="muted" style={{ fontSize: '0.8rem' }}>
+              {currentAts !== null
+                ? `Current match: ${currentAts}/100`
+                : 'Pick a resume + paste the JD to see your current match'}
+            </span>
+          </div>
+          <div className="ats-target-row">
+            <input
+              type="range"
+              min={40}
+              max={100}
+              step={5}
+              value={targetAts}
+              onChange={(e) => setTargetAts(Number(e.target.value))}
+              className="ats-target-slider"
+            />
+            <div className="ats-target-value">{targetAts}</div>
+          </div>
+          <p className="muted ats-target-hint">{atsTargetHint(targetAts)}</p>
         </div>
 
         <div className="row" style={{ marginTop: '0.75rem', flexWrap: 'wrap' }}>

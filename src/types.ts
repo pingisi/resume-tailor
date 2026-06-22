@@ -67,6 +67,8 @@ export interface GenerateRequest {
   role?: string;
   recipient?: ApplicationRecipient;
   keywords?: string[];
+  /** 0-100. Higher = more aggressive fabrication to hit ATS keywords. */
+  targetAts?: number;
 }
 
 export interface GenerateResponse {

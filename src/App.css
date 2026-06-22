@@ -754,6 +754,43 @@ button.danger:hover:not(:disabled) { background: var(--danger-soft); }
   margin-top: 0.5rem;
 }
 
+/* ---------- ATS target picker ---------- */
+.ats-target {
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--preview-bg);
+}
+.ats-target-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+.ats-target-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.ats-target-slider {
+  flex: 1;
+  accent-color: var(--accent);
+}
+.ats-target-value {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--accent);
+  min-width: 2.5rem;
+  text-align: right;
+}
+.ats-target-hint {
+  font-size: 0.78rem;
+  margin: 0.35rem 0 0;
+}
+
 /* ---------- Section editor ---------- */
 .section-editor {
   display: flex;
