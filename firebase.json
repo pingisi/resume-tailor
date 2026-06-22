@@ -10,6 +10,7 @@
         { "source": "/api/prepare-interview", "function": "prepareInterview" },
         { "source": "/api/answer-questions", "function": "answerQuestions" },
         { "source": "/api/compose-message", "function": "composeMessage" },
+        { "source": "/api/score-fit", "function": "scoreFit" },
         { "source": "**", "destination": "/index.html" }
       ]
     }

@@ -8,7 +8,7 @@ const STORAGE_KEY = 'resume-tailor:quota';
 const SOFT_LIMIT = 250;
 const WARN_THRESHOLD = 0.8;
 
-export type QuotaKind = 'generate' | 'interview' | 'answers' | 'message';
+export type QuotaKind = 'generate' | 'interview' | 'answers' | 'message' | 'fit';
 
 interface QuotaState {
   date: string; // YYYY-MM-DD UTC
@@ -16,6 +16,7 @@ interface QuotaState {
   interview: number;
   answers: number;
   message: number;
+  fit: number;
 }
 
 function today(): string {
@@ -26,10 +27,24 @@ function load(): QuotaState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw)
-      return { date: today(), generate: 0, interview: 0, answers: 0, message: 0 };
+      return {
+        date: today(),
+        generate: 0,
+        interview: 0,
+        answers: 0,
+        message: 0,
+        fit: 0,
+      };
     const parsed = JSON.parse(raw) as Partial<QuotaState> & { date?: string };
     if (parsed.date !== today()) {
-      return { date: today(), generate: 0, interview: 0, answers: 0, message: 0 };
+      return {
+        date: today(),
+        generate: 0,
+        interview: 0,
+        answers: 0,
+        message: 0,
+        fit: 0,
+      };
     }
     return {
       date: parsed.date,
@@ -37,9 +52,17 @@ function load(): QuotaState {
       interview: parsed.interview ?? 0,
       answers: parsed.answers ?? 0,
       message: parsed.message ?? 0,
+      fit: parsed.fit ?? 0,
     };
   } catch {
-    return { date: today(), generate: 0, interview: 0, answers: 0, message: 0 };
+    return {
+      date: today(),
+      generate: 0,
+      interview: 0,
+      answers: 0,
+      message: 0,
+      fit: 0,
+    };
   }
 }
 
@@ -64,6 +87,7 @@ export interface QuotaSnapshot {
   interview: number;
   answers: number;
   message: number;
+  fit: number;
   total: number;
   limit: number;
   pct: number;
@@ -73,13 +97,14 @@ export interface QuotaSnapshot {
 
 export function snapshot(): QuotaSnapshot {
   const s = load();
-  const total = s.generate + s.interview + s.answers + s.message;
+  const total = s.generate + s.interview + s.answers + s.message + s.fit;
   return {
     date: s.date,
     generate: s.generate,
     interview: s.interview,
     answers: s.answers,
     message: s.message,
+    fit: s.fit,
     total,
     limit: SOFT_LIMIT,
     pct: Math.min(1, total / SOFT_LIMIT),

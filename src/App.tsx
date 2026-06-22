@@ -44,6 +44,39 @@ export default function App() {
     })();
   }, [refreshResumes, refreshApplications]);
 
+  // Bookmarklet hand-off: a URL like "#jd=<encoded JSON {text,url,title,company,role}>"
+  // pre-fills the New form, then clears the hash so a refresh doesn't repeat it.
+  useEffect(() => {
+    if (!loaded) return;
+    const hash = window.location.hash;
+    const m = /^#jd=(.+)$/.exec(hash);
+    if (!m) return;
+    try {
+      const raw = decodeURIComponent(m[1]);
+      const payload = JSON.parse(raw) as {
+        text?: string;
+        url?: string;
+        title?: string;
+        company?: string;
+        role?: string;
+      };
+      const text = (payload.text || '').slice(0, 15000);
+      if (text.length < 30) return;
+      setFormPrefill({
+        jobDescription: text,
+        jdUrl: payload.url,
+        company: payload.company,
+        role: payload.role,
+      });
+      setTab('new');
+      setSelectedAppId(null);
+    } catch {
+      /* ignore malformed bookmarklet payload */
+    } finally {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }, [loaded]);
+
   useEffect(() => {
     if (!selectedAppId) {
       setSelectedApp(null);

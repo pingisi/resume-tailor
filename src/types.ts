@@ -153,4 +153,20 @@ export interface ApplicationFormPrefill {
   recipientTitle?: string;
   tone?: string;
   targetAts?: number;
+  jobDescription?: string;
+  jdUrl?: string;
+}
+
+export interface FitScoreRequest {
+  resumeText: string;
+  jobDescription: string;
+  company?: string;
+  role?: string;
+}
+
+export interface FitScoreResponse {
+  score: number; // 1-10
+  verdict: string;
+  reasonsToApply: string[];
+  gapsToAddress: string[];
 }

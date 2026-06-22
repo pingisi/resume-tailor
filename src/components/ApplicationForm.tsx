@@ -8,9 +8,11 @@ import {
   generateDocumentsStream,
   fetchJobDescriptionFromUrl,
 } from '../api/generate';
+import { scoreFit } from '../api/fitScore';
 import { extractKeywords, ats } from '../lib/keywords';
 import { makeApplicationId, saveApplication } from '../lib/storage';
 import { OutputPanel } from './OutputPanel';
+import { BookmarkletCard } from './BookmarkletCard';
 
 function atsTargetHint(t: number): string {
   if (t >= 95)
@@ -56,6 +58,13 @@ export function ApplicationForm({
   const [error, setError] = useState<string | null>(null);
   const [resumeOut, setResumeOut] = useState('');
   const [coverOut, setCoverOut] = useState('');
+  const [fitChecking, setFitChecking] = useState(false);
+  const [fitResult, setFitResult] = useState<{
+    score: number;
+    verdict: string;
+    reasonsToApply: string[];
+    gapsToAddress: string[];
+  } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -79,7 +88,14 @@ export function ApplicationForm({
     setJdUrl('');
     setResumeOut('');
     setCoverOut('');
+    setFitResult(null);
     setError(null);
+    if (prefill.jobDescription !== undefined) {
+      setJobDescription(prefill.jobDescription);
+    }
+    if (prefill.jdUrl !== undefined) {
+      setJdUrl(prefill.jdUrl);
+    }
     onPrefillConsumed?.();
   }, [prefill, onPrefillConsumed]);
 
@@ -212,6 +228,28 @@ export function ApplicationForm({
     abortRef.current?.abort();
   }
 
+  async function handleCheckFit() {
+    if (!selectedResume) return;
+    if (jobDescription.trim().length < 30) return;
+    setFitChecking(true);
+    setError(null);
+    setFitResult(null);
+    try {
+      const r = await scoreFit({
+        resumeText: selectedResume.text,
+        jobDescription,
+        company: company || undefined,
+        role: role || undefined,
+      });
+      setFitResult(r);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Fit check failed.';
+      setError(msg);
+    } finally {
+      setFitChecking(false);
+    }
+  }
+
   async function handleSave(status: 'draft' | 'applied') {
     if (!selectedResume || !canSave) return;
     setSaving(true);
@@ -276,6 +314,7 @@ export function ApplicationForm({
 
   return (
     <>
+      <BookmarkletCard />
       <div className="card">
         <h2>New application</h2>
 
@@ -426,13 +465,22 @@ export function ApplicationForm({
             </select>
           </label>
           {!busy ? (
-            <button
-              className="primary"
-              onClick={handleGenerate}
-              disabled={!canGenerate}
-            >
-              Generate
-            </button>
+            <>
+              <button
+                onClick={handleCheckFit}
+                disabled={!canGenerate || fitChecking}
+                title="Get a 1-10 fit score + gaps to address, before spending a Generate call"
+              >
+                {fitChecking ? 'Checking fit…' : 'Check fit'}
+              </button>
+              <button
+                className="primary"
+                onClick={handleGenerate}
+                disabled={!canGenerate}
+              >
+                Generate
+              </button>
+            </>
           ) : (
             <>
               <span className="muted">Streaming response…</span>
@@ -440,6 +488,56 @@ export function ApplicationForm({
             </>
           )}
         </div>
+
+        {fitResult && (
+          <div
+            style={{
+              marginTop: '0.75rem',
+              padding: '0.75rem 1rem',
+              borderRadius: 8,
+              border: '1px solid var(--border)',
+              background:
+                fitResult.score >= 7
+                  ? 'rgba(34, 139, 34, 0.08)'
+                  : fitResult.score >= 4
+                    ? 'rgba(204, 153, 0, 0.08)'
+                    : 'rgba(204, 0, 0, 0.08)',
+            }}
+          >
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <strong>
+                Fit score: {fitResult.score}/10
+                {fitResult.score >= 7 ? ' — apply' : fitResult.score >= 4 ? ' — borderline' : ' — skip'}
+              </strong>
+              <button onClick={() => setFitResult(null)} title="Dismiss">
+                ×
+              </button>
+            </div>
+            {fitResult.verdict && (
+              <p style={{ margin: '0.25rem 0 0.5rem' }}>{fitResult.verdict}</p>
+            )}
+            {fitResult.reasonsToApply.length > 0 && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <strong style={{ fontSize: '0.85rem' }}>Why it fits</strong>
+                <ul style={{ marginTop: '0.25rem', paddingLeft: '1.25rem' }}>
+                  {fitResult.reasonsToApply.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {fitResult.gapsToAddress.length > 0 && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <strong style={{ fontSize: '0.85rem' }}>Gaps to address</strong>
+                <ul style={{ marginTop: '0.25rem', paddingLeft: '1.25rem' }}>
+                  {fitResult.gapsToAddress.map((g, i) => (
+                    <li key={i}>{g}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {error && <p className="error">{error}</p>}
       </div>

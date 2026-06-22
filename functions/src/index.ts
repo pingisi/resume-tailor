@@ -784,3 +784,136 @@ export const composeMessage = onRequest(
     }
   }
 );
+
+// ---------- Fit score (triage helper) ----------
+
+const FIT_SCORE_SYSTEM_PROMPT = `You are a no-nonsense hiring-bar evaluator.
+Given a candidate's resume and a target job description, judge whether the
+candidate should spend time tailoring + applying.
+
+Score 1-10:
+  1-3  poor match (probably skip)
+  4-6  partial match (apply only if the candidate can hide gaps well)
+  7-8  strong match
+  9-10 excellent match (apply with confidence)
+
+Be calibrated and slightly conservative. Do NOT inflate scores.
+
+Return STRICT JSON of this exact shape and nothing else:
+{
+  "score": <integer 1-10>,
+  "verdict": "<one short sentence summarising the call to action>",
+  "reasonsToApply": ["<concrete reason 1>", "<reason 2>", "<reason 3>"],
+  "gapsToAddress": ["<gap or risk 1>", "<gap or risk 2>"]
+}
+
+Rules:
+- Each \`reasonsToApply\` item must reference SOMETHING ACTUALLY IN THE RESUME
+  that maps to the JD (skill, project, years, domain). Be specific.
+- Each \`gapsToAddress\` item must be a real missing thing the JD asks for that
+  the resume lacks. If there are no real gaps, return an empty array (do not
+  invent gaps).
+- Never invent candidate experience or fabricate accomplishments.`;
+
+interface FitBody {
+  resumeText?: string;
+  jobDescription?: string;
+  company?: string;
+  role?: string;
+}
+
+export const scoreFit = onRequest(
+  {
+    cors: true,
+    secrets: [GEMINI_API_KEY],
+    timeoutSeconds: 60,
+    memory: '512MiB',
+    region: 'us-central1',
+  },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method not allowed' });
+      return;
+    }
+
+    const body = (req.body || {}) as FitBody;
+    const resumeText = (body.resumeText || '').trim();
+    const jobDescription = (body.jobDescription || '').trim();
+    if (resumeText.length < 50 || jobDescription.length < 30) {
+      res.status(400).json({ error: 'Resume or job description too short.' });
+      return;
+    }
+    if (resumeText.length > 30000 || jobDescription.length > 15000) {
+      res.status(413).json({ error: 'Input too large.' });
+      return;
+    }
+
+    const company = (body.company || '').trim();
+    const role = (body.role || '').trim();
+
+    try {
+      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY.value());
+      const model = genAI.getGenerativeModel({
+        model: MODEL,
+        systemInstruction: FIT_SCORE_SYSTEM_PROMPT,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.3,
+        },
+      });
+
+      const lines: (string | null)[] = [
+        company ? `Company: ${company}` : null,
+        role ? `Target role: ${role}` : null,
+        '',
+        '=== CANDIDATE RESUME ===',
+        resumeText,
+        '',
+        '=== JOB DESCRIPTION ===',
+        jobDescription,
+      ];
+      const prompt = lines.filter((l) => l !== null).join('\n');
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+
+      let parsed: {
+        score?: unknown;
+        verdict?: unknown;
+        reasonsToApply?: unknown;
+        gapsToAddress?: unknown;
+      };
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        res
+          .status(502)
+          .json({ error: 'Model returned non-JSON.', raw: text.substring(0, 200) });
+        return;
+      }
+
+      const rawScore =
+        typeof parsed.score === 'number' ? Math.round(parsed.score) : NaN;
+      const score = Math.max(1, Math.min(10, isFinite(rawScore) ? rawScore : 0));
+      if (!score) {
+        res.status(502).json({ error: 'Model returned no score.' });
+        return;
+      }
+      const out = {
+        score,
+        verdict: typeof parsed.verdict === 'string' ? parsed.verdict : '',
+        reasonsToApply: Array.isArray(parsed.reasonsToApply)
+          ? parsed.reasonsToApply.filter((s): s is string => typeof s === 'string')
+          : [],
+        gapsToAddress: Array.isArray(parsed.gapsToAddress)
+          ? parsed.gapsToAddress.filter((s): s is string => typeof s === 'string')
+          : [],
+      };
+      res.json(out);
+    } catch (err) {
+      const e = err as { message?: string };
+      console.error('scoreFit error', err);
+      res.status(500).json({ error: e?.message || 'Internal error' });
+    }
+  }
+);
