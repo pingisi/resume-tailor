@@ -23,27 +23,70 @@ CRITICAL RULES (NON-NEGOTIABLE):
      GitHub, etc.) at the very top, COPY IT VERBATIM to the output. This is
      the first section, before any "##" headings.
 
-2. PRESERVE ALL EXISTING BULLETS AND ENRICH SPARSE ROLES:
-   - NEVER drop, merge, or summarize away existing bullet points.
-   - If a role originally had 8 bullets, the output must have AT LEAST 8 bullets.
-   - EDIT, ENHANCE, and REORDER existing bullets, but always preserve the
-     original substance. Example: "Reduced query time from 5s to 1s using
-     Redis caching" stays; you might add "(evaluated 3 caching strategies)"
-     but never reduce it to "Optimized caching."
+2. EVERY ROLE MUST HAVE 6-8 BULLET POINTS — NO EXCEPTIONS:
+   ═══════════════════════════════════════════════════════════════════════
+   This is THE MOST IMPORTANT RULE. There must be NO empty roles, NO roles
+   with only 1-2 bullets, NO "headline-only" roles. EVERY single role in
+   the Experience section MUST have between 6 and 8 detailed bullet points.
+   ═══════════════════════════════════════════════════════════════════════
    
-   - IF A ROLE IS SPARSE (fewer than 4–5 bullets), INFER and ADD plausible
-     accomplishments consistent with:
-     * The job title, company type, and industry
-     * The candidate's seniority level (inferred from other roles)
-     * The JD requirements (infer what they likely did to succeed in that role)
-     * The dates/tenure (longer tenure → more scope)
-   - AIM FOR 6-8 BULLETS per role minimum. Each should include:
-     * An action verb (built, led, improved, reduced, optimized, etc.)
-     * The specific scope or technology (not generic)
-     * A measurable outcome, business impact, or technical depth
-   - Example: If original resume says "Software Engineer at TechCorp", infer
-     and add: "Implemented microservices using Python & AWS Lambda, reducing
-     deployment time from 2 hours to 10 minutes; owned 3 services in prod."
+   HOW TO HANDLE EACH ROLE TYPE:
+   
+   a) ROLES WITH 6+ EXISTING BULLETS:
+      - PRESERVE ALL existing bullets verbatim (you may enhance with keywords).
+      - Output MUST have at least as many bullets as the original.
+   
+   b) ROLES WITH 1-5 EXISTING BULLETS:
+      - KEEP all original bullets, then INFER and ADD MORE bullets until
+        the role has 6-8 total bullets.
+      - Inferred bullets MUST be plausible for the role title, company,
+        industry, and candidate's seniority.
+   
+   c) ROLES WITH NO BULLETS (just title + company + dates):
+      - This is a "skeleton role" — you MUST generate 6-8 bullets from
+        scratch. Base them on:
+        * The exact job title (e.g., "Senior Software Engineer" → leadership,
+          architecture, mentoring, code reviews, system design)
+        * The company name/type (e.g., bank → compliance, security, scale;
+          startup → MVPs, fast iteration, full-stack ownership)
+        * The tenure length (longer = more scope, leadership growth)
+        * The candidate's overall seniority trajectory (other roles)
+        * The JOB DESCRIPTION you're tailoring for — pull in relevant tech
+          and responsibilities that would be expected for this role.
+      - DO NOT leave the role empty. DO NOT write "responsibilities included
+        general software development". GENERATE specific, detailed bullets.
+   
+   d) ALWAYS preserve original substance — never reduce or summarize existing
+      bullets to save space.
+   
+   BEFORE FINALIZING THE OUTPUT, VERIFY: Each ### role heading must be
+   followed by AT LEAST 6 bullet points starting with "- ". If any role
+   has fewer than 6 bullets, GO BACK and add more inferred bullets.
+   
+   EXAMPLE OF GOOD ENRICHMENT:
+   Original input:
+     ### Software Engineer — TechCorp (2020-2022)
+   
+   Bad output (DO NOT DO THIS):
+     ### Software Engineer — TechCorp *(2020–2022)*
+     - Worked as a Software Engineer at TechCorp.
+   
+   Good output (REQUIRED):
+     ### Software Engineer — TechCorp *(Toronto • 2020–2022)*
+     - Designed and built RESTful microservices in Python (FastAPI) deployed
+       to AWS ECS, handling 500K+ requests/day with 99.9% uptime
+     - Migrated legacy monolith database to PostgreSQL with zero downtime,
+       reducing query latency by 60% via indexing and query optimization
+     - Implemented CI/CD pipelines using GitHub Actions + Docker, reducing
+       deployment time from 45 min to 8 min
+     - Led code reviews for a team of 5 engineers, established testing
+       standards (pytest, 85%+ coverage) that reduced production bugs by 40%
+     - Collaborated with product managers and designers to ship 3 customer-
+       facing features per quarter, contributing to 25% YoY user growth
+     - Mentored 2 junior engineers, conducting weekly 1:1s and pair-coding
+       sessions to accelerate their ramp-up
+     - Built monitoring dashboards in Datadog to track service health and
+       SLA compliance, enabling proactive incident response
 
 3. NEVER change employers, job titles, exact employment dates, or degrees.
 
@@ -55,8 +98,9 @@ CRITICAL RULES (NON-NEGOTIABLE):
      line or grouped logically. NO run-on comma lists.
    - **## Experience**: EXACTLY one subsection per role, formatted as:
      \`### Title — Company *(City • Start–End)*\`
-     Blank line, then 4-7+ bullet points (PRESERVE ORIGINALS), each starting
-     with \`- \` (hyphen + space). NO nested bullet points.
+     Blank line, then **6-8 bullet points (MANDATORY MINIMUM 6 — see Rule 2)**,
+     each starting with \`- \` (hyphen + space). NO nested bullet points.
+     NO role may have fewer than 6 bullets — fill in inferred details if needed.
    
    - **BULLET QUALITY RULES**: Each bullet should follow the pattern:
      [Action verb] [specific technology/scope] [measurable outcome/impact]
@@ -130,8 +174,9 @@ function fabricationPolicy(target: number, requiredKwCount: number, niceToHaveKw
       `- You MAY claim hands-on proficiency with any tool/framework in the JD.`,
       `- NEVER change employers, titles, dates, schools, or degrees.`,
       `- PRESERVE ALL existing bullets; do not summarize or drop them.`,
-      `- For sparse roles, generously infer and add 4-6 details that align with`,
-      `  the role title, company context, and JD. Be creative but plausible.`,
+      `- EVERY role MUST have 6-8 bullets. Empty or sparse roles MUST be fully`,
+      `  populated with detailed, role-appropriate inferred accomplishments`,
+      `  drawn from the role title, company, dates, and JD context.`,
       `- The cover letter must echo the strongest 5-8 REQUIRED keywords and`,
       `  reference at least two specific JD requirements.`,
     ].join('\n');
@@ -146,8 +191,9 @@ function fabricationPolicy(target: number, requiredKwCount: number, niceToHaveKw
       `  cover missing REQUIRED keywords — keep them realistic.`,
       `- Do NOT invent customers, revenue numbers, or awards.`,
       `- PRESERVE ALL existing bullets and accomplishments.`,
-      `- For sparse roles, infer and add 3-5 plausible accomplishments that`,
-      `  are reasonable for the role title, company scale, and seniority.`,
+      `- EVERY role MUST have 6-8 bullets. For sparse or empty roles, infer`,
+      `  and add detailed accomplishments grounded in the role title, company,`,
+      `  seniority, and JD context. No role may be left thin.`,
     ].join('\n');
   }
   if (t >= 60) {
@@ -159,8 +205,9 @@ function fabricationPolicy(target: number, requiredKwCount: number, niceToHaveKw
       `- Prefer paraphrasing existing bullets to add keywords rather than`,
       `  inventing new ones.`,
       `- PRESERVE ALL existing bullets and accomplishments.`,
-      `- For sparse roles, infer and add 2-4 plausible details grounded in the`,
-      `  candidate's seniority, the role title, and typical scope.`,
+      `- EVERY role MUST have 6-8 bullets. For sparse or empty roles, infer`,
+      `  and add detailed accomplishments grounded in the role title and`,
+      `  typical scope for the seniority level.`,
     ].join('\n');
   }
   return [
@@ -171,9 +218,10 @@ function fabricationPolicy(target: number, requiredKwCount: number, niceToHaveKw
     `  already supports that claim. NICE-TO-HAVE keywords are extra; skip them`,
     `  if not already truthful.`,
     `- PRESERVE ALL existing bullets and accomplishments.`,
-    `- For sparse roles (< 4 bullets), infer and add reasonable accomplishments`,
-    `  based on the role title, company type, and seniority — but only details`,
-    `  that would be typical/expected for that role. No fabricated metrics.`,
+    `- EVERY role MUST have 6-8 bullets. For sparse or empty roles, infer`,
+    `  and add reasonable accomplishments based on the role title, company`,
+    `  type, and seniority. Avoid specific fabricated metrics — use ranges`,
+    `  or general impact statements instead.`,
   ].join('\n');
 }
 
