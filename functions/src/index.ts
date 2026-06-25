@@ -127,6 +127,17 @@ CRITICAL RULES (NON-NEGOTIABLE):
 
 7. The user prompt will contain a FABRICATION POLICY block. Follow it literally.
 
+8. PREVIOUS-ATTEMPT FEEDBACK (when present):
+   - If the user prompt contains a "=== PREVIOUS ATTEMPT FEEDBACK ===" section,
+     it includes the prior tailored resume and the gaps that scored it below 10/10.
+   - Use the PREVIOUS RESUME as your starting point (not the original) and
+     RAISE its fit score by directly ADDRESSING each listed gap:
+     * Weave the missing skills/keywords into existing bullets where plausible
+     * Add new bullets where a gap has no existing home (preserving originals)
+     * Strengthen weak claims with more specific tech/scope/outcomes
+   - Do NOT regress: every accomplishment in the PREVIOUS RESUME must remain.
+   - The goal is incremental improvement toward 10/10.
+
 ═════════════════════════════════════════════════════════════════════════════
 OUTPUT FORMAT — RAW MARKDOWN ONLY, NO JSON, NO CODE FENCES:
 ═════════════════════════════════════════════════════════════════════════════
@@ -156,6 +167,15 @@ interface Body {
   keywords?: string[];
   /** 0-100. Higher = more aggressive fabrication. */
   targetAts?: number;
+  /** Feedback from the previous attempt's fit score, used for iterative
+   *  auto-improvement loops. When present, the previous tailored resume is
+   *  used as the starting point and the gaps must be explicitly addressed. */
+  previousFeedback?: {
+    score?: number;
+    verdict?: string;
+    gaps?: string[];
+    previousResume?: string;
+  };
 }
 
 function fabricationPolicy(target: number, requiredKwCount: number, niceToHaveKwCount: number): string {
@@ -238,6 +258,15 @@ function buildPrompt(b: Body): string {
     requiredKws.length,
     niceToHaveKws.length
   );
+
+  const fb = b.previousFeedback;
+  const hasFeedback =
+    !!fb &&
+    ((Array.isArray(fb.gaps) && fb.gaps.length > 0) ||
+      typeof fb.previousResume === 'string');
+  const gaps = Array.isArray(fb?.gaps) ? fb!.gaps.filter((g) => typeof g === 'string' && g.trim()) : [];
+  const prevResume = (fb?.previousResume || '').trim();
+
   const parts: (string | null)[] = [
     `Tone: ${(b.tone || 'professional').trim()}`,
     b.company ? `Company: ${b.company.trim()}` : null,
@@ -261,6 +290,26 @@ function buildPrompt(b: Body): string {
     '',
     '=== JOB DESCRIPTION ===',
     (b.jobDescription || '').trim(),
+    hasFeedback
+      ? [
+          '',
+          '=== PREVIOUS ATTEMPT FEEDBACK (iterative improvement mode) ===',
+          typeof fb?.score === 'number' ? `Previous fit score: ${fb.score}/10` : null,
+          fb?.verdict ? `Verdict: ${fb.verdict}` : null,
+          gaps.length
+            ? `Gaps to address in this revision:\n${gaps.map((g) => `- ${g}`).join('\n')}`
+            : null,
+          prevResume
+            ? [
+                '',
+                'PREVIOUS TAILORED RESUME (use as starting point — preserve everything, then address gaps):',
+                prevResume,
+              ].join('\n')
+            : null,
+        ]
+          .filter((l) => l !== null)
+          .join('\n')
+      : null,
   ];
   return parts.filter((l) => l !== null).join('\n');
 }

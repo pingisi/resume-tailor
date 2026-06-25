@@ -228,6 +228,69 @@ export function ApplicationForm({
     abortRef.current?.abort();
   }
 
+  async function handleAutoImproveIteration(feedback: {
+    score: number;
+    verdict: string;
+    reasonsToApply: string[];
+    gapsToAddress: string[];
+  }): Promise<{ resume: string; coverLetter: string }> {
+    if (!selectedResume) {
+      throw new Error('No base resume selected.');
+    }
+    setBusy(true);
+    setStreaming(true);
+    setError(null);
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    let nextResume = '';
+    let nextCover = '';
+    try {
+      const result = await generateDocumentsStream(
+        {
+          resumeText: selectedResume.text,
+          jobDescription,
+          tone,
+          company: company || undefined,
+          role: role || undefined,
+          recipient:
+            recipientName || recipientTitle
+              ? {
+                  name: recipientName || undefined,
+                  title: recipientTitle || undefined,
+                }
+              : undefined,
+          keywords: extractKeywords(jobDescription, 30),
+          targetAts,
+          previousFeedback: {
+            score: feedback.score,
+            verdict: feedback.verdict,
+            gaps: feedback.gapsToAddress,
+            previousResume: resumeOut,
+          },
+        },
+        (p) => {
+          setResumeOut(p.resume);
+          setCoverOut(p.coverLetter);
+          nextResume = p.resume;
+          nextCover = p.coverLetter;
+        },
+        ctrl.signal
+      );
+      return { resume: result.resume, coverLetter: result.coverLetter };
+    } catch (e) {
+      if ((e as { name?: string })?.name !== 'AbortError') {
+        const msg = e instanceof Error ? e.message : 'Auto-improve iteration failed.';
+        setError(msg);
+      }
+      // Return whatever we managed to stream so the loop can still proceed/stop gracefully
+      return { resume: nextResume || resumeOut, coverLetter: nextCover || coverOut };
+    } finally {
+      setBusy(false);
+      setStreaming(false);
+    }
+  }
+
   async function handleCheckFit() {
     if (!selectedResume) return;
     if (jobDescription.trim().length < 30) return;
@@ -552,6 +615,7 @@ export function ApplicationForm({
             streaming={streaming}
             company={company}
             role={role}
+            onAutoImprove={handleAutoImproveIteration}
           />
           {!streaming && resumeOut && coverOut && (
             <div className="card">

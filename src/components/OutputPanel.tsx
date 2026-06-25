@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useState, useRef, type CSSProperties } from 'react';
 import { marked } from 'marked';
 import { downloadMarkdown, downloadPdf, downloadDocx } from '../lib/exporters';
 import {
@@ -28,6 +28,13 @@ interface Props {
   /** Optional metadata used to build descriptive download filenames */
   company?: string;
   role?: string;
+  /** When provided, the Fit check tab shows an "Auto-improve to 10/10" button
+   *  that regenerates the resume with feedback from the previous fit score. The
+   *  callback must regenerate, update the resume prop, and resolve with the new
+   *  resume + cover letter so the loop can re-score. */
+  onAutoImprove?: (
+    feedback: FitScoreResponse
+  ) => Promise<{ resume: string; coverLetter: string }>;
 }
 
 type Tab = 'resume' | 'cover';
@@ -59,6 +66,7 @@ export function OutputPanel({
   onEdit,
   company,
   role,
+  onAutoImprove,
 }: Props) {
   const [tab, setTab] = useState<Tab>('resume');
   const [aux, setAux] = useState<Aux>('preview');
@@ -68,6 +76,10 @@ export function OutputPanel({
   const [fitResult, setFitResult] = useState<FitScoreResponse | null>(null);
   const [fitChecking, setFitChecking] = useState(false);
   const [fitError, setFitError] = useState<string | null>(null);
+  const [autoImproving, setAutoImproving] = useState(false);
+  const [autoImproveStatus, setAutoImproveStatus] = useState<string | null>(null);
+  const [autoImproveHistory, setAutoImproveHistory] = useState<number[]>([]);
+  const autoImproveCancelRef = useRef(false);
 
   const template = TEMPLATES[templateId];
   const active = tab === 'resume' ? resume : coverLetter;
@@ -120,6 +132,8 @@ export function OutputPanel({
     setFitChecking(true);
     setFitError(null);
     setFitResult(null);
+    setAutoImproveStatus(null);
+    setAutoImproveHistory([]);
     try {
       const r = await scoreFit({
         resumeText: resume,
@@ -133,6 +147,68 @@ export function OutputPanel({
     } finally {
       setFitChecking(false);
     }
+  }
+
+  const MAX_AUTO_IMPROVE_ITERATIONS = 5;
+
+  async function runAutoImprove() {
+    if (!fitResult || !onAutoImprove || !jobDescription) return;
+    if (fitResult.score >= 10) return;
+    autoImproveCancelRef.current = false;
+    setAutoImproving(true);
+    setFitError(null);
+    setAutoImproveHistory([fitResult.score]);
+
+    let current = fitResult;
+    try {
+      for (let i = 1; i <= MAX_AUTO_IMPROVE_ITERATIONS; i++) {
+        if (autoImproveCancelRef.current) {
+          setAutoImproveStatus(`Cancelled at iteration ${i}.`);
+          break;
+        }
+        setAutoImproveStatus(`Iteration ${i}/${MAX_AUTO_IMPROVE_ITERATIONS}: regenerating with feedback…`);
+        const next = await onAutoImprove(current);
+        if (autoImproveCancelRef.current) {
+          setAutoImproveStatus(`Cancelled at iteration ${i}.`);
+          break;
+        }
+        setAutoImproveStatus(`Iteration ${i}/${MAX_AUTO_IMPROVE_ITERATIONS}: scoring new resume…`);
+        const newFit = await scoreFit({
+          resumeText: next.resume,
+          jobDescription,
+          company: company || undefined,
+          role: role || undefined,
+        });
+        setFitResult(newFit);
+        setAutoImproveHistory((h) => [...h, newFit.score]);
+
+        if (newFit.score >= 10) {
+          setAutoImproveStatus(`Reached 10/10 in ${i} iteration(s). Done.`);
+          break;
+        }
+        if (newFit.score <= current.score) {
+          setAutoImproveStatus(
+            `Score plateaued at ${newFit.score}/10 after iteration ${i}. Stopping (no improvement).`
+          );
+          break;
+        }
+        if (i === MAX_AUTO_IMPROVE_ITERATIONS) {
+          setAutoImproveStatus(
+            `Hit max ${MAX_AUTO_IMPROVE_ITERATIONS} iterations at ${newFit.score}/10. Stopping.`
+          );
+          break;
+        }
+        current = newFit;
+      }
+    } catch (e) {
+      setFitError(e instanceof Error ? e.message : 'Auto-improve failed.');
+    } finally {
+      setAutoImproving(false);
+    }
+  }
+
+  function cancelAutoImprove() {
+    autoImproveCancelRef.current = true;
   }
 
   return (
@@ -316,6 +392,49 @@ export function OutputPanel({
                     ))}
                   </ul>
                 </div>
+              )}
+
+              {/* Auto-improve loop controls */}
+              {onAutoImprove && fitResult.score < 10 && (
+                <div
+                  style={{
+                    marginTop: '0.75rem',
+                    paddingTop: '0.75rem',
+                    borderTop: '1px solid var(--border)',
+                  }}
+                >
+                  {!autoImproving ? (
+                    <button
+                      className="primary"
+                      type="button"
+                      onClick={() => void runAutoImprove()}
+                      disabled={fitChecking}
+                      title={`Iteratively regenerates the resume with feedback up to ${MAX_AUTO_IMPROVE_ITERATIONS} times until the fit score hits 10/10.`}
+                    >
+                      Auto-improve to 10/10 (up to {MAX_AUTO_IMPROVE_ITERATIONS} iterations)
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={cancelAutoImprove}
+                    >
+                      Cancel auto-improve
+                    </button>
+                  )}
+                  <p className="muted" style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}>
+                    Each iteration burns 1 generate call + 1 fit-score call from your daily quota.
+                  </p>
+                </div>
+              )}
+              {autoImproveStatus && (
+                <p className="muted" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                  {autoImproveStatus}
+                </p>
+              )}
+              {autoImproveHistory.length > 1 && (
+                <p className="muted" style={{ marginTop: '0.25rem', fontSize: '0.8rem' }}>
+                  Score history: {autoImproveHistory.join(' → ')}
+                </p>
               )}
             </div>
           )}

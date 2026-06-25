@@ -72,6 +72,14 @@ export interface GenerateRequest {
   keywords?: string[];
   /** 0-100. Higher = more aggressive fabrication to hit ATS keywords. */
   targetAts?: number;
+  /** Optional feedback from the previous attempt's fit score, used for
+   *  iterative auto-improvement loops. */
+  previousFeedback?: {
+    score: number;
+    verdict?: string;
+    gaps: string[];
+    previousResume?: string;
+  };
 }
 
 export interface GenerateResponse {
