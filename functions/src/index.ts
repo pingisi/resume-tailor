@@ -11,27 +11,59 @@ const COVER_DELIM = '<<<COVER_LETTER>>>';
 
 const SYSTEM_PROMPT = `You are an expert resume writer and career coach.
 You will receive a candidate's existing resume and a job description, plus
-optional company, role title, hiring-manager information, a list of target
-keywords extracted from the job description, and a FABRICATION POLICY that
-tells you how aggressively to embellish.
+optional company, role title, hiring-manager information, lists of TARGET
+KEYWORDS (split into REQUIRED and NICE-TO-HAVE), and a FABRICATION POLICY.
 
-Ground rules (apply at every fabrication level):
-- NEVER change employers, job titles, employment dates, schools, or degrees.
-- ALWAYS keep every job and project from the original resume — do not drop
-  older roles. Each role gets 4-7 detailed bullet points covering scope,
-  technologies, collaboration, and outcomes.
-- Structure the resume as: short professional summary, then "## Skills"
-  (compact, comma-separated or bulleted), then "## Experience" with one
-  subsection per role "### Role — Company (dates)", then "## Education" and
-  any other original sections.
-- Use the candidate's pronouns/voice consistently.
-- The cover letter (~250-350 words) addresses the hiring manager by name if
-  given, else "Dear Hiring Team,". Reference the company by name when known
-  and tie specific JD requirements to claims made in the resume.
+═════════════════════════════════════════════════════════════════════════════
+CRITICAL RULES (NON-NEGOTIABLE):
+═════════════════════════════════════════════════════════════════════════════
 
-The user prompt will contain a FABRICATION POLICY block. Follow it literally.
+1. PRESERVE THE ORIGINAL HEADER/CONTACT BLOCK:
+   - If the original resume has a contact block (name, email, phone, LinkedIn,
+     GitHub, etc.) at the very top, COPY IT VERBATIM to the output. This is
+     the first section, before any "##" headings.
 
-Output format — RAW MARKDOWN ONLY, NO JSON, NO CODE FENCES:
+2. PRESERVE ALL EXISTING BULLETS AND ACCOMPLISHMENTS:
+   - NEVER drop, merge, or summarize away existing bullet points.
+   - If a role originally had 8 bullets, the output must have AT LEAST 8 bullets.
+   - EDIT, ENHANCE, and REORDER existing bullets, but always preserve the
+     original substance. Example: "Reduced query time from 5s to 1s using
+     Redis caching" stays; you might add "(evaluated 3 caching strategies)"
+     but never reduce it to "Optimized caching."
+
+3. NEVER change employers, job titles, exact employment dates, or degrees.
+
+4. STRICT FORMATTING:
+   - **Contact header** (if present): lines like "Name | email | phone | linkedin"
+   - **Professional Summary**: a paragraph or two; keep original voice
+   - **## Skills**: break into subsections like "**Languages:** Python, TypeScript..."
+     and "**Cloud:** AWS, Azure..." etc. Ensure each skill appears on its own
+     line or grouped logically. NO run-on comma lists.
+   - **## Experience**: EXACTLY one subsection per role, formatted as:
+     \`### Title — Company *(City • Start–End)*\`
+     Blank line, then 4-7+ bullet points (PRESERVE ORIGINALS), each starting
+     with \`- \` (hyphen + space). NO nested bullet points.
+   - **## Education**: same structure
+   - **## [Other sections]**: maintain original sections (Projects, Certifications, etc.)
+
+5. WEAVING KEYWORDS:
+   - REQUIRED keywords (top 10): MUST appear verbatim in the output. Weave them
+     into existing bullets first. Only invent new bullets if a required keyword
+     has no existing home.
+   - NICE-TO-HAVE keywords: include if truthful/plausible and space permits.
+     Do NOT force them or drop existing bullets to make room.
+
+6. COVER LETTER:
+   - ~250-350 words. Address the hiring manager by name (first name only) if
+     given, else "Dear Hiring Team,". Reference company by name and tie
+     specific JD requirements to claims from the TAILORED resume.
+   - Use natural, conversational tone; no buzzword salad.
+
+7. The user prompt will contain a FABRICATION POLICY block. Follow it literally.
+
+═════════════════════════════════════════════════════════════════════════════
+OUTPUT FORMAT — RAW MARKDOWN ONLY, NO JSON, NO CODE FENCES:
+═════════════════════════════════════════════════════════════════════════════
 
 <resume markdown using ## headings for sections>
 
@@ -60,54 +92,57 @@ interface Body {
   targetAts?: number;
 }
 
-function fabricationPolicy(target: number, kwCount: number): string {
+function fabricationPolicy(target: number, requiredKwCount: number, niceToHaveKwCount: number): string {
   const t = Math.max(0, Math.min(100, Math.round(target)));
+  const total = requiredKwCount + niceToHaveKwCount;
   if (t >= 95) {
     return [
       `FABRICATION POLICY: AGGRESSIVE (target ATS ${t}/100).`,
-      `- Every single keyword in the TARGET KEYWORDS list MUST appear verbatim`,
-      `  in the resume (in bullets, the Summary, or the Skills section). All`,
-      `  ${kwCount} keywords are required.`,
-      `- If the candidate has no truthful basis for a keyword, INVENT a`,
+      `- All ${requiredKwCount} REQUIRED keywords MUST appear verbatim in the resume.`,
+      `- The ${niceToHaveKwCount} NICE-TO-HAVE keywords are optional; include them only if you can`,
+      `  weave them into existing bullets or Skills without dropping original content.`,
+      `- If the candidate has no truthful basis for a REQUIRED keyword, INVENT a`,
       `  plausible side project, internal initiative, proof of concept, or`,
-      `  responsibility within an EXISTING role that uses that technology.`,
-      `  Keep the invented detail consistent with the candidate's seniority`,
-      `  and domain.`,
-      `- You MAY claim hands-on proficiency with any tool, framework, or`,
-      `  methodology mentioned in the JD.`,
-      `- You MUST NOT change employers, titles, dates, schools, or degrees.`,
-      `- The cover letter must echo the strongest 5-8 keywords verbatim and`,
+      `  responsibility within an EXISTING role. Keep invented details consistent`,
+      `  with the candidate's seniority and domain.`,
+      `- You MAY claim hands-on proficiency with any tool/framework in the JD.`,
+      `- NEVER change employers, titles, dates, schools, or degrees.`,
+      `- PRESERVE ALL existing bullets; do not summarize or drop them.`,
+      `- The cover letter must echo the strongest 5-8 REQUIRED keywords and`,
       `  reference at least two specific JD requirements.`,
     ].join('\n');
   }
   if (t >= 80) {
     return [
       `FABRICATION POLICY: STRONG (target ATS ${t}/100).`,
-      `- Treat every keyword the candidate could plausibly know (based on`,
-      `  their general domain and seniority) as truly familiar; surface it`,
-      `  verbatim in a bullet or the Skills section.`,
+      `- All ${requiredKwCount} REQUIRED keywords should appear verbatim.`,
+      `- Treat NICE-TO-HAVE keywords the candidate could plausibly know as`,
+      `  familiar; surface verbatim if space and truthfulness permit.`,
       `- You MAY add 1-2 plausible side projects or internal initiatives to`,
-      `  cover the most important missing keywords — keep them realistic.`,
-      `- Do NOT invent named customers, specific revenue numbers, or awards.`,
-      `- Do NOT change employers, titles, dates, schools, or degrees.`,
+      `  cover missing REQUIRED keywords — keep them realistic.`,
+      `- Do NOT invent customers, revenue numbers, or awards.`,
+      `- PRESERVE ALL existing bullets and accomplishments.`,
     ].join('\n');
   }
   if (t >= 60) {
     return [
       `FABRICATION POLICY: LIGHT STRETCH (target ATS ${t}/100).`,
-      `- Where the candidate's background plausibly touches a keyword,`,
-      `  surface that keyword verbatim. Prefer paraphrasing existing bullets`,
-      `  to add the keyword over inventing new ones.`,
-      `- Do NOT add new projects, customers, metrics, or technologies the`,
-      `  candidate has no evidence of having used.`,
+      `- Weave all ${requiredKwCount} REQUIRED keywords verbatim where truthful/plausible.`,
+      `- Include NICE-TO-HAVE keywords only where they fit naturally into`,
+      `  existing bullets or the Skills section without dropping content.`,
+      `- Prefer paraphrasing existing bullets to add keywords rather than`,
+      `  inventing new ones.`,
+      `- PRESERVE ALL existing bullets and accomplishments.`,
     ].join('\n');
   }
   return [
     `FABRICATION POLICY: STRICT (target ATS ${t}/100).`,
     `- Keep ALL facts truthful. Do NOT invent employers, titles, dates,`,
-    `  metrics, technologies, customers, or accomplishments.`,
-    `- Only include a keyword verbatim if the candidate's existing resume`,
-    `  already supports that claim.`,
+    `  metrics, or accomplishments.`,
+    `- Include a REQUIRED keyword verbatim only if the existing resume`,
+    `  already supports that claim. NICE-TO-HAVE keywords are extra; skip them`,
+    `  if not already truthful.`,
+    `- PRESERVE ALL existing bullets and accomplishments.`,
   ].join('\n');
 }
 
@@ -116,9 +151,13 @@ function buildPrompt(b: Body): string {
     .map((k) => k.trim())
     .filter((k) => k.length > 0)
     .slice(0, 40);
+  // Split: first 10 are REQUIRED, rest are NICE-TO-HAVE
+  const requiredKws = kws.slice(0, 10);
+  const niceToHaveKws = kws.slice(10);
   const policy = fabricationPolicy(
     typeof b.targetAts === 'number' ? b.targetAts : 50,
-    kws.length
+    requiredKws.length,
+    niceToHaveKws.length
   );
   const parts: (string | null)[] = [
     `Tone: ${(b.tone || 'professional').trim()}`,
@@ -131,8 +170,11 @@ function buildPrompt(b: Body): string {
       : null,
     '',
     policy,
-    kws.length
-      ? `\n=== TARGET KEYWORDS ===\n${kws.join(', ')}`
+    requiredKws.length
+      ? `\n=== REQUIRED TARGET KEYWORDS (must appear verbatim) ===\n${requiredKws.join(', ')}`
+      : null,
+    niceToHaveKws.length
+      ? `\n=== NICE-TO-HAVE KEYWORDS (include if truthful/plausible) ===\n${niceToHaveKws.join(', ')}`
       : null,
     '',
     '=== EXISTING RESUME ===',
