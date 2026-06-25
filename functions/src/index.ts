@@ -23,13 +23,27 @@ CRITICAL RULES (NON-NEGOTIABLE):
      GitHub, etc.) at the very top, COPY IT VERBATIM to the output. This is
      the first section, before any "##" headings.
 
-2. PRESERVE ALL EXISTING BULLETS AND ACCOMPLISHMENTS:
+2. PRESERVE ALL EXISTING BULLETS AND ENRICH SPARSE ROLES:
    - NEVER drop, merge, or summarize away existing bullet points.
    - If a role originally had 8 bullets, the output must have AT LEAST 8 bullets.
    - EDIT, ENHANCE, and REORDER existing bullets, but always preserve the
      original substance. Example: "Reduced query time from 5s to 1s using
      Redis caching" stays; you might add "(evaluated 3 caching strategies)"
      but never reduce it to "Optimized caching."
+   
+   - IF A ROLE IS SPARSE (fewer than 4–5 bullets), INFER and ADD plausible
+     accomplishments consistent with:
+     * The job title, company type, and industry
+     * The candidate's seniority level (inferred from other roles)
+     * The JD requirements (infer what they likely did to succeed in that role)
+     * The dates/tenure (longer tenure → more scope)
+   - AIM FOR 6-8 BULLETS per role minimum. Each should include:
+     * An action verb (built, led, improved, reduced, optimized, etc.)
+     * The specific scope or technology (not generic)
+     * A measurable outcome, business impact, or technical depth
+   - Example: If original resume says "Software Engineer at TechCorp", infer
+     and add: "Implemented microservices using Python & AWS Lambda, reducing
+     deployment time from 2 hours to 10 minutes; owned 3 services in prod."
 
 3. NEVER change employers, job titles, exact employment dates, or degrees.
 
@@ -43,6 +57,14 @@ CRITICAL RULES (NON-NEGOTIABLE):
      \`### Title — Company *(City • Start–End)*\`
      Blank line, then 4-7+ bullet points (PRESERVE ORIGINALS), each starting
      with \`- \` (hyphen + space). NO nested bullet points.
+   
+   - **BULLET QUALITY RULES**: Each bullet should follow the pattern:
+     [Action verb] [specific technology/scope] [measurable outcome/impact]
+     Good: "Led design & implementation of real-time notification system using
+            Redis & WebSockets, serving 2M+ daily active users"
+     Bad: "Did backend work" or "Worked with databases"
+   - Bullets should be 1-2 lines max, dense with specifics, free of buzzwords.
+   
    - **## Education**: same structure
    - **## [Other sections]**: maintain original sections (Projects, Certifications, etc.)
 
@@ -108,6 +130,8 @@ function fabricationPolicy(target: number, requiredKwCount: number, niceToHaveKw
       `- You MAY claim hands-on proficiency with any tool/framework in the JD.`,
       `- NEVER change employers, titles, dates, schools, or degrees.`,
       `- PRESERVE ALL existing bullets; do not summarize or drop them.`,
+      `- For sparse roles, generously infer and add 4-6 details that align with`,
+      `  the role title, company context, and JD. Be creative but plausible.`,
       `- The cover letter must echo the strongest 5-8 REQUIRED keywords and`,
       `  reference at least two specific JD requirements.`,
     ].join('\n');
@@ -122,6 +146,8 @@ function fabricationPolicy(target: number, requiredKwCount: number, niceToHaveKw
       `  cover missing REQUIRED keywords — keep them realistic.`,
       `- Do NOT invent customers, revenue numbers, or awards.`,
       `- PRESERVE ALL existing bullets and accomplishments.`,
+      `- For sparse roles, infer and add 3-5 plausible accomplishments that`,
+      `  are reasonable for the role title, company scale, and seniority.`,
     ].join('\n');
   }
   if (t >= 60) {
@@ -133,6 +159,8 @@ function fabricationPolicy(target: number, requiredKwCount: number, niceToHaveKw
       `- Prefer paraphrasing existing bullets to add keywords rather than`,
       `  inventing new ones.`,
       `- PRESERVE ALL existing bullets and accomplishments.`,
+      `- For sparse roles, infer and add 2-4 plausible details grounded in the`,
+      `  candidate's seniority, the role title, and typical scope.`,
     ].join('\n');
   }
   return [
@@ -143,6 +171,9 @@ function fabricationPolicy(target: number, requiredKwCount: number, niceToHaveKw
     `  already supports that claim. NICE-TO-HAVE keywords are extra; skip them`,
     `  if not already truthful.`,
     `- PRESERVE ALL existing bullets and accomplishments.`,
+    `- For sparse roles (< 4 bullets), infer and add reasonable accomplishments`,
+    `  based on the role title, company type, and seniority — but only details`,
+    `  that would be typical/expected for that role. No fabricated metrics.`,
   ].join('\n');
 }
 
